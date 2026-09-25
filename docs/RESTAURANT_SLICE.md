@@ -22,9 +22,9 @@ These restaurant read requests are unauthenticated; the menu read route is docum
 | `GET /api/public/opening-hours` | Timezone, Monday-to-Sunday weekly rules, and special rules from the current local date onward. |
 | `GET /api/public/opening-status` | `openNow`, `closedToday`, local date/time, timezone, `WEEKLY` or `SPECIAL` source, and the selected day's times. |
 
-Other routes remain denied by default; `/api/admin/**` requires owner authentication as described in [ADMIN_AUTH.md](ADMIN_AUTH.md). The owner can now edit the existing restaurant profile and hours through the admin API below. Menu, promotion, and image workflows remain separate future work. No production credentials or business seed data are embedded in migrations.
+Other routes remain denied by default; `/api/admin/**` requires owner authentication as described in [ADMIN_AUTH.md](ADMIN_AUTH.md). The owner can edit the restaurant profile and hours through the admin API below. Menu and informational promotion workflows are implemented; menu image support is currently an optional URL reference only, with no upload/storage workflow. No production credentials or business seed data are embedded in migrations.
 
-The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1 migration, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
+The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1–V5 migrations, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
 
 ## Owner editing contract
 
