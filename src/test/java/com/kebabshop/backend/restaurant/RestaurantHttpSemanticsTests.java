@@ -1,0 +1,57 @@
+package com.kebabshop.backend.restaurant;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+class RestaurantHttpSemanticsTests {
+    @DynamicPropertySource
+    static void isolatedDatabase(DynamicPropertyRegistry registry) {
+        String url = "jdbc:h2:mem:gio_kebab_http_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+        registry.add("spring.datasource.url", () -> url);
+        registry.add("spring.datasource.username", () -> "sa");
+        registry.add("spring.datasource.password", () -> "");
+        registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
+        registry.add("spring.flyway.url", () -> url);
+        registry.add("spring.flyway.user", () -> "sa");
+        registry.add("spring.flyway.password", () -> "");
+    }
+
+    @LocalServerPort int port;
+    @Autowired RestaurantProfileRepository profiles;
+
+    @Test
+    void realHttpKeepsMissingProfileAndScheduleStatuses() throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> missingProfile = get(client, "/api/public/restaurant");
+            assertEquals(404, missingProfile.statusCode());
+            assertTrue(missingProfile.body().contains("Restaurant profile is not configured"));
+            assertFalse(missingProfile.body().contains("stackTrace"));
+            profiles.saveAndFlush(new RestaurantProfile("Test Restaurant", "Fresh food", "1 Main Street",
+                    "+37060000000", null, "https://maps.example.com/test", null, null, null, null));
+            assertEquals(503, get(client, "/api/public/opening-status").statusCode());
+        }
+    }
+
+    private HttpResponse<String> get(HttpClient client, String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .timeout(Duration.ofSeconds(5)).GET().build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+}

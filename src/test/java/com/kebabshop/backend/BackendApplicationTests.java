@@ -23,14 +23,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class BackendApplicationTests {
 
-    // Highest-precedence test properties keep this smoke test on an in-memory database.
     @DynamicPropertySource
     static void isolatedDatabase(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> "jdbc:h2:mem:gio_kebab_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+        String url = "jdbc:h2:mem:gio_kebab_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+        registry.add("spring.datasource.url", () -> url);
         registry.add("spring.datasource.username", () -> "sa");
         registry.add("spring.datasource.password", () -> "");
         registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
-        registry.add("spring.flyway.url", () -> "jdbc:h2:mem:gio_kebab_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+        registry.add("spring.flyway.url", () -> url);
         registry.add("spring.flyway.user", () -> "sa");
         registry.add("spring.flyway.password", () -> "");
     }
@@ -50,7 +50,7 @@ class BackendApplicationTests {
         try (var connection = dataSource.getConnection()) {
             assertEquals("jdbc:h2:mem:gio_kebab_test", connection.getMetaData().getURL().split(";")[0]);
         }
-        assertEquals(0, flyway.info().all().length);
+        assertEquals(1, flyway.info().all().length);
     }
 
     @Test
