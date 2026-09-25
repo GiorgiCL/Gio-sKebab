@@ -1,0 +1,5 @@
+ALTER TABLE menu_item
+    ADD COLUMN featured BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE menu_item
+    ADD COLUMN image_url VARCHAR(2048);

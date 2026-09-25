@@ -50,7 +50,7 @@ class BackendApplicationTests {
         try (var connection = dataSource.getConnection()) {
             assertEquals("jdbc:h2:mem:gio_kebab_test", connection.getMetaData().getURL().split(";")[0]);
         }
-        assertEquals(4, flyway.info().all().length);
+        assertEquals(5, flyway.info().all().length);
     }
 
     @Test

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -40,6 +41,7 @@ class MenuApiTests {
     @Autowired AdminProvisioningService provisioning;
     @Autowired MenuCategoryRepository categories;
     @Autowired MenuItemRepository items;
+    @Autowired JdbcTemplate jdbc;
 
     @BeforeEach
     void reset() {
@@ -64,9 +66,16 @@ class MenuApiTests {
 
     private String item(long categoryId, String name, String price, boolean active,
                         boolean available, int order) {
+        return item(categoryId, name, price, active, available, false, null, order);
+    }
+
+    private String item(long categoryId, String name, String price, boolean active,
+                        boolean available, boolean featured, String imageUrl, int order) {
         return "{\"categoryId\":" + categoryId + ",\"name\":\"" + name
                 + "\",\"description\":\"Fresh food\",\"priceEur\":" + price
                 + ",\"active\":" + active + ",\"available\":" + available
+                + ",\"featured\":" + featured + ",\"imageUrl\":"
+                + (imageUrl == null ? "null" : "\"" + imageUrl + "\"")
                 + ",\"displayOrder\":" + order + "}";
     }
 
@@ -187,5 +196,93 @@ class MenuApiTests {
         mvc.perform(put("/api/public/menu").with(csrf()).contentType("application/json")
                         .content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void featuredAndImageUrlAreManagedAndExposedWithoutChangingMenuVisibilityRules() throws Exception {
+        MockHttpSession session = ownerSession();
+        long visible = createCategory(session, "Visible", 0, true);
+        long hidden = createCategory(session, "Hidden", 1, false);
+
+        long itemId = createItem(session, visible, "Featured", "8.50", true, true, 0);
+        mvc.perform(get("/api/admin/menu/items/" + itemId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured").value(false))
+                .andExpect(jsonPath("$.imageUrl").doesNotExist());
+
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Featured", "8.50", true, false, true,
+                                "https://images.example.com/kebab.jpg", 0)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured").value(true))
+                .andExpect(jsonPath("$.imageUrl").value("https://images.example.com/kebab.jpg"));
+        mvc.perform(get("/api/public/menu"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[0].items[0].featured").value(true))
+                .andExpect(jsonPath("$.categories[0].items[0].imageUrl")
+                        .value("https://images.example.com/kebab.jpg"));
+
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Featured", "8.50", true, false, false,
+                                "https://cdn.example.com/new.jpg", 0)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured").value(false))
+                .andExpect(jsonPath("$.imageUrl").value("https://cdn.example.com/new.jpg"));
+
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Featured", "8.50", true, false, true, null, 0)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured").value(true))
+                .andExpect(jsonPath("$.imageUrl").doesNotExist());
+
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Featured", "8.50", true, false, true, "", 0)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.imageUrl").doesNotExist());
+
+        createItem(session, visible, "Sold out", "7.00", true, false, 1);
+        createItem(session, hidden, "Hidden category item", "6.00", true, true, 0);
+        mvc.perform(get("/api/public/menu"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories.length()").value(1))
+                .andExpect(jsonPath("$.categories[0].items.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].items[0].featured").value(true))
+                .andExpect(jsonPath("$.categories[0].items[0].imageUrl").doesNotExist())
+                .andExpect(jsonPath("$.categories[0].items[0].available").value(false));
+
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Bad image", "8.50", true, true, false,
+                                "javascript:alert(1)", 0)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Bad image", "8.50", true, true, false,
+                                "//images.example.com/image.jpg", 0)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Bad image", "8.50", true, true, false,
+                                "https://images.example.com/" + "x".repeat(2050), 0)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/menu/items/" + itemId).session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.featured").value(true))
+                .andExpect(jsonPath("$.imageUrl").doesNotExist());
+    }
+
+    @Test
+    void v5SchemaDefaultsFeaturedToFalseAndAllowsNullImageUrlOnH2() throws Exception {
+        MockHttpSession session = ownerSession();
+        long categoryId = createCategory(session, "Food", 0, true);
+        jdbc.update("INSERT INTO menu_item (category_id, name, description, price_eur, active, available, "
+                        + "display_order, created_at, updated_at) VALUES (?, 'Kebab', 'Fresh food', 8.50, "
+                        + "TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", categoryId);
+        assertEquals(false, jdbc.queryForObject(
+                "SELECT featured FROM menu_item WHERE category_id = ?", Boolean.class, categoryId));
+        assertEquals(null, jdbc.queryForObject(
+                "SELECT image_url FROM menu_item WHERE category_id = ?", String.class, categoryId));
     }
 }

@@ -4,7 +4,7 @@
 
 Build a genuinely useful, production-ready website and content-management system for Gio's Kebab. The same backend and database serve an account-free customer website and an authenticated owner interface. Academic documentation should explain the real design and implementation; it must not drive artificial complexity.
 
-The repository started as a minimal Spring Boot application (`BackendApplication`) with one context-load test and a Maven build. The `pom.xml` baseline is Java 21 and Spring Boot 4.1.1, with Spring Web MVC, Security, Data JPA, Validation, Flyway/PostgreSQL support, PostgreSQL runtime driver, DevTools, and Spring Boot test starters. The backend foundation provides local/test/production database configuration, fast isolated H2 tests, and a separate PostgreSQL Testcontainers validation layer; see [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md). The restaurant slice has a Flyway migration, public read routes, and authenticated owner editing for profile and hours; see [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md). Menu category/item and informational promotion management and public reads are described in [MENU_SLICE.md](MENU_SLICE.md) and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Owner session authentication and first-account provisioning are described in [ADMIN_AUTH.md](ADMIN_AUTH.md). Image storage, frontend, deployment assets, proxy login limits, recovery, and full CI execution remain future work.
+The repository started as a minimal Spring Boot application (`BackendApplication`) with one context-load test and a Maven build. The `pom.xml` baseline is Java 21 and Spring Boot 4.1.1, with Spring Web MVC, Security, Data JPA, Validation, Flyway/PostgreSQL support, PostgreSQL runtime driver, DevTools, and Spring Boot test starters. The backend foundation provides local/test/production database configuration, fast isolated H2 tests, and a separate PostgreSQL Testcontainers validation layer; see [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md). Restaurant profile/hours, owner session authentication/provisioning, menu categories/items, and informational promotions have backend slices documented in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md), [ADMIN_AUTH.md](ADMIN_AUTH.md), [MENU_SLICE.md](MENU_SLICE.md), and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Menu items include featured state and an optional HTTP/HTTPS image URL reference. Image upload/storage, frontend, deployment assets, proxy login limits, recovery, and full CI execution remain future work.
 
 ## Product boundaries
 
@@ -14,7 +14,7 @@ Provide restaurant information, address/contact and map link, opening status and
 
 ### Owner interface
 
-Provide authenticated, low-friction tools for managing restaurant details and links, normal and special-date opening hours, categories, menu items, item images, availability, featured state, display order, optional allergen/dietary metadata, and promotions. Normal business changes must not require source-code edits or developer intervention. Keep a single-owner administration model unless a demonstrated need changes it.
+Provide authenticated, low-friction tools for managing restaurant details and links, normal and special-date opening hours, categories, menu items, optional image URL references, availability, featured state, display order, and promotions. Normal business changes must not require source-code edits or developer intervention. Keep a single-owner administration model unless a demonstrated need changes it. Uploads and allergen/dietary metadata are excluded from V1 unless requirements change.
 
 ## Architecture and data design principles
 
@@ -63,9 +63,9 @@ Model recurring weekly hours and date-specific exceptions, including explicit cl
 
 ### F. Menu categories and items
 
-Design categories and menu items, including name, description, price/currency, category, image reference, available/sold-out state, featured state, display order, timestamps, and optional allergen/dietary metadata. Decide soft-hide/archive and deletion semantics, referential integrity, and how category ordering behaves. Categories and items must be data-managed, never hardcoded into application logic.
+Design categories and menu items, including name, description, price/currency, category, optional HTTP/HTTPS image URL, available/sold-out state, featured state, display order, and timestamps. Decide soft-hide/archive and deletion semantics, referential integrity, and how category ordering behaves. Categories and items must be data-managed, never hardcoded into application logic. Dietary metadata is excluded from V1.
 
-**Exit:** schema and service rules support safe management and stable public ordering.
+**Exit:** schema and service rules support safe management and stable public ordering. **Status: implemented in backend slices; image URLs are references only, with no upload/storage workflow.**
 
 ### G. Admin authentication and security boundary
 
@@ -73,11 +73,11 @@ Implement owner-only authentication with secure password hashing, protected admi
 
 **Exit:** unauthenticated access is limited to intended public reads; admin access and recovery are usable and tested.
 
-### H. Image and media storage
+### H. Optional image upload and media storage
 
-Define a storage adapter independent of a final cloud vendor. Implement upload validation, size limits, MIME/content inspection, safe object keys, replacement and removal lifecycle, metadata persistence, optimized public retrieval, and orphan cleanup/reconciliation. Prevent uploads from being served as executable content. Document operational storage configuration and retention.
+Only implement this phase if owner-managed uploads are a confirmed product need. The current V1 menu contract stores an optional HTTP/HTTPS image URL and does not upload or store files. If uploads are later required, define a storage adapter independent of a final cloud vendor, validate size and actual content, use safe object keys, implement replacement/removal and metadata persistence, provide optimized public retrieval and orphan cleanup, and document storage configuration and retention. Prevent uploaded content from being served as executable content.
 
-**Exit:** the owner can upload, replace, and remove menu imagery safely without storing large blobs in PostgreSQL.
+**Exit:** if selected, the owner can upload, replace, and remove menu imagery safely without storing large blobs in PostgreSQL. **Status: deferred; not required for the current URL-reference contract.**
 
 ### I. Promotions
 
@@ -157,4 +157,4 @@ Do not implement payments, checkout/cart, internal online ordering, delivery tra
 
 ## Release gates
 
-Before public launch, require: clean migration from an empty production-like PostgreSQL database; automated coverage for public/admin boundaries and core content flows; owner authentication and recovery validation; safe media upload lifecycle; responsive/accessibility and SEO checks; documented deploy/rollback and environment variables; verified health/readiness and monitoring; successful database and media restore drill; and owner acceptance of the CMS and handover instructions.
+Before public launch, require: clean migration from an empty production-like PostgreSQL database; automated coverage for public/admin boundaries and core content flows; owner authentication and recovery validation; responsive/accessibility and SEO checks; documented deploy/rollback and environment variables; verified health/readiness and monitoring; successful database restore drill; and owner acceptance of the CMS and handover instructions. Require media upload safety and media restore only if uploads are added to the product scope.

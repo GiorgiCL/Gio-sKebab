@@ -56,8 +56,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("4", flyway.info().current().getVersion().toString());
-        assertEquals(4, flyway.info().applied().length);
+        assertEquals("5", flyway.info().current().getVersion().toString());
+        assertEquals(5, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -113,6 +113,17 @@ class PostgresqlSchemaIT {
                         + "display_order, created_at, updated_at) "
                         + "VALUES (?, 'Kebab', 'Fresh food', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 categoryId);
+        assertEquals(false, jdbc.queryForObject("SELECT featured FROM menu_item WHERE category_id = ?", Boolean.class, categoryId));
+        assertEquals(null, jdbc.queryForObject("SELECT image_url FROM menu_item WHERE category_id = ?", String.class, categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET featured = NULL WHERE category_id = ?", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET image_url = ? WHERE category_id = ?", "x".repeat(2049), categoryId));
+        jdbc.update("UPDATE menu_item SET featured = TRUE, image_url = ? WHERE category_id = ?",
+                "https://images.example.com/kebab.jpg", categoryId);
+        assertEquals(true, jdbc.queryForObject("SELECT featured FROM menu_item WHERE category_id = ?", Boolean.class, categoryId));
+        assertEquals("https://images.example.com/kebab.jpg",
+                jdbc.queryForObject("SELECT image_url FROM menu_item WHERE category_id = ?", String.class, categoryId));
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("DELETE FROM menu_category WHERE id = ?", categoryId));
         assertThrows(DataIntegrityViolationException.class,

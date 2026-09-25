@@ -93,7 +93,7 @@ class MenuService {
     ItemResponse createItem(ItemRequest request) {
         requireCategory(request.categoryId());
         var item = new MenuItem(request.categoryId(), request.name(), request.description(), request.priceEur(),
-                request.active(), request.available(), request.displayOrder());
+                request.active(), request.available(), request.featured(), request.imageUrl(), request.displayOrder());
         entityManager.persist(item);
         entityManager.flush();
         entityManager.refresh(item);
@@ -105,7 +105,7 @@ class MenuService {
         var item = requireItem(id);
         requireCategory(request.categoryId());
         item.replace(request.categoryId(), request.name(), request.description(), request.priceEur(),
-                request.active(), request.available(), request.displayOrder());
+                request.active(), request.available(), request.featured(), request.imageUrl(), request.displayOrder());
         entityManager.flush();
         entityManager.refresh(item);
         return ItemResponse.from(item);

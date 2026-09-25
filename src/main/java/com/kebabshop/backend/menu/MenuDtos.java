@@ -19,6 +19,7 @@ record ItemRequest(@NotNull @Min(1) Long categoryId,
                    @NotBlank @Size(max = 1000) String description,
                    @NotNull @DecimalMin("0.01") @Digits(integer = 8, fraction = 2) BigDecimal priceEur,
                    @NotNull Boolean active, @NotNull Boolean available,
+                   @NotNull Boolean featured, @Size(max = 2048) String imageUrl,
                    @NotNull @Min(0) Integer displayOrder) {}
 
 record CategoryResponse(Long id, String name, int displayOrder, boolean active,
@@ -30,19 +31,21 @@ record CategoryResponse(Long id, String name, int displayOrder, boolean active,
 }
 
 record ItemResponse(Long id, Long categoryId, String name, String description, BigDecimal priceEur,
-                    boolean active, boolean available, int displayOrder, Instant createdAt, Instant updatedAt) {
+                    boolean active, boolean available, boolean featured, String imageUrl,
+                    int displayOrder, Instant createdAt, Instant updatedAt) {
     static ItemResponse from(MenuItem item) {
         return new ItemResponse(item.getId(), item.getCategoryId(), item.getName(), item.getDescription(),
-                item.getPriceEur(), item.isActive(), item.isAvailable(), item.getDisplayOrder(),
+                item.getPriceEur(), item.isActive(), item.isAvailable(), item.isFeatured(), item.getImageUrl(), item.getDisplayOrder(),
                 item.getCreatedAt(), item.getUpdatedAt());
     }
 }
 
 record PublicMenuResponse(List<PublicCategory> categories) {}
 record PublicCategory(Long id, String name, List<PublicItem> items) {}
-record PublicItem(Long id, String name, String description, BigDecimal priceEur, boolean available) {
+record PublicItem(Long id, String name, String description, BigDecimal priceEur,
+                  boolean available, boolean featured, String imageUrl) {
     static PublicItem from(MenuItem item) {
         return new PublicItem(item.getId(), item.getName(), item.getDescription(),
-                item.getPriceEur(), item.isAvailable());
+                item.getPriceEur(), item.isAvailable(), item.isFeatured(), item.getImageUrl());
     }
 }
