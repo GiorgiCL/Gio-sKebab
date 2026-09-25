@@ -1,6 +1,7 @@
 package com.kebabshop.backend.restaurant;
 
 import jakarta.persistence.EntityManagerFactory;
+import com.kebabshop.backend.auth.AdminProvisioningService;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,7 @@ class PostgresqlSchemaIT {
     @Autowired EntityManagerFactory entityManagerFactory;
     @Autowired JdbcTemplate jdbc;
     @Autowired RestaurantProfileRepository profiles;
+    @Autowired AdminProvisioningService provisioning;
 
     @Test
     void flywayJpaAndPostgresqlConstraintsWorkTogether() throws SQLException {
@@ -50,8 +52,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("1", flyway.info().current().getVersion().toString());
-        assertEquals(1, flyway.info().applied().length);
+        assertEquals("2", flyway.info().current().getVersion().toString());
+        assertEquals(2, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -70,5 +72,16 @@ class PostgresqlSchemaIT {
         jdbc.update("INSERT INTO special_opening_hours (special_date, is_open) VALUES (?, FALSE)", LocalDate.of(2026, 12, 25));
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("INSERT INTO special_opening_hours (special_date, is_open) VALUES (?, FALSE)", LocalDate.of(2026, 12, 25)));
+
+        provisioning.createFirstAccount("OWNER@Example.com", "temporary-test-password");
+        assertEquals("owner@example.com", jdbc.queryForObject("SELECT email FROM admin_account WHERE id = 1", String.class));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE admin_account SET id = 2 WHERE id = 1"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE admin_account SET email = 'OWNER@example.com' WHERE id = 1"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE admin_account SET password_hash = ' ' WHERE id = 1"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE admin_account SET enabled = NULL WHERE id = 1"));
     }
 }

@@ -191,10 +191,10 @@ class RestaurantPublicApiTests {
     void onlyListedReadsArePublic() throws Exception {
         profile();
         mvc.perform(get("/api/public/restaurant")).andExpect(status().isOk());
-        mvc.perform(get("/api/public/unknown")).andExpect(status().isForbidden());
-        mvc.perform(get("/api/admin/example")).andExpect(status().isForbidden());
-        mvc.perform(head("/api/public/restaurant")).andExpect(status().isForbidden());
-        mvc.perform(post("/api/public/restaurant").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/public/unknown")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/example")).andExpect(status().isUnauthorized());
+        mvc.perform(head("/api/public/restaurant")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/public/restaurant").with(csrf())).andExpect(status().isUnauthorized());
     }
 
     @Test

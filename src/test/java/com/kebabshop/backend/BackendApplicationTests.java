@@ -50,13 +50,13 @@ class BackendApplicationTests {
         try (var connection = dataSource.getConnection()) {
             assertEquals("jdbc:h2:mem:gio_kebab_test", connection.getMetaData().getURL().split(";")[0]);
         }
-        assertEquals(1, flyway.info().all().length);
+        assertEquals(2, flyway.info().all().length);
     }
 
     @Test
-    void adminRoutesAreDeniedBeforeAuthenticationExists() throws Exception {
+    void adminRoutesRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/admin/example"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
 }
