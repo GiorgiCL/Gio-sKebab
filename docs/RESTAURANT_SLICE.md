@@ -14,7 +14,7 @@ A complete weekly schedule has seven rows, including explicit closed days. When 
 
 ## Public contract
 
-Only these unauthenticated read requests are permitted:
+These restaurant read requests are unauthenticated; the menu read route is documented in [MENU_SLICE.md](MENU_SLICE.md):
 
 | Endpoint | Response |
 | --- | --- |

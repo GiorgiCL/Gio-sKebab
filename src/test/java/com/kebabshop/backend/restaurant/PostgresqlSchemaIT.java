@@ -56,8 +56,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("2", flyway.info().current().getVersion().toString());
-        assertEquals(2, flyway.info().applied().length);
+        assertEquals("3", flyway.info().current().getVersion().toString());
+        assertEquals(3, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -100,5 +100,26 @@ class PostgresqlSchemaIT {
         admin.replaceSpecial(date, new SpecialDateReplacementRequest(true, LocalTime.NOON, LocalTime.of(14, 0)));
         admin.deleteSpecial(date);
         assertEquals(1, admin.specialDates().size());
+
+        Long categoryId = jdbc.queryForObject("INSERT INTO menu_category "
+                + "(name, display_order, active, created_at, updated_at) "
+                + "VALUES ('Food', 0, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id", Long.class);
+        assertNotNull(categoryId);
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_category SET display_order = -1 WHERE id = ?", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_category SET name = ' ' WHERE id = ?", categoryId));
+        jdbc.update("INSERT INTO menu_item (category_id, name, description, price_eur, active, available, "
+                        + "display_order, created_at, updated_at) "
+                        + "VALUES (?, 'Kebab', 'Fresh food', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                categoryId);
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("DELETE FROM menu_category WHERE id = ?", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET price_eur = 0 WHERE category_id = ?", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET category_id = 999999 WHERE category_id = ?", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET display_order = -1 WHERE category_id = ?", categoryId));
     }
 }

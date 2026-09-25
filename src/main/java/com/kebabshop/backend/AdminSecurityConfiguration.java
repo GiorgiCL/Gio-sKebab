@@ -82,7 +82,8 @@ class AdminSecurityConfiguration {
                 .securityContext(config -> config.securityContextRepository(contexts))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.GET, "/api/public/restaurant",
-                                "/api/public/opening-hours", "/api/public/opening-status").permitAll()
+                                "/api/public/opening-hours", "/api/public/opening-status",
+                                "/api/public/menu").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/admin/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/auth/login").permitAll()
                         .requestMatchers("/api/admin/**").authenticated()
