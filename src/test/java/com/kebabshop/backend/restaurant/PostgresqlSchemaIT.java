@@ -56,8 +56,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("3", flyway.info().current().getVersion().toString());
-        assertEquals(3, flyway.info().applied().length);
+        assertEquals("4", flyway.info().current().getVersion().toString());
+        assertEquals(4, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -121,5 +121,18 @@ class PostgresqlSchemaIT {
                 () -> jdbc.update("UPDATE menu_item SET category_id = 999999 WHERE category_id = ?", categoryId));
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE menu_item SET display_order = -1 WHERE category_id = ?", categoryId));
+
+        jdbc.update("INSERT INTO promotion (title, description, active, starts_at, ends_at, display_order, "
+                        + "created_at, updated_at) VALUES ('Open ended', NULL, TRUE, NULL, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion (title, active, display_order, created_at, updated_at) "
+                        + "VALUES (' ', TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion (title, active, display_order, created_at, updated_at) "
+                        + "VALUES ('Invalid order', TRUE, -1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion (title, active, starts_at, ends_at, display_order, created_at, updated_at) "
+                        + "VALUES ('Invalid window', TRUE, TIMESTAMPTZ '2026-09-26 10:00:00+00', "
+                        + "TIMESTAMPTZ '2026-09-25 10:00:00+00', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"));
     }
 }

@@ -4,7 +4,7 @@
 
 Build a genuinely useful, production-ready website and content-management system for Gio's Kebab. The same backend and database serve an account-free customer website and an authenticated owner interface. Academic documentation should explain the real design and implementation; it must not drive artificial complexity.
 
-The repository started as a minimal Spring Boot application (`BackendApplication`) with one context-load test and a Maven build. The `pom.xml` baseline is Java 21 and Spring Boot 4.1.1, with Spring Web MVC, Security, Data JPA, Validation, Flyway/PostgreSQL support, PostgreSQL runtime driver, DevTools, and Spring Boot test starters. The backend foundation provides local/test/production database configuration, fast isolated H2 tests, and a separate PostgreSQL Testcontainers validation layer; see [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md). The restaurant slice has a Flyway migration, public read routes, and authenticated owner editing for profile and hours; see [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md). Menu category/item management and public reads are described in [MENU_SLICE.md](MENU_SLICE.md). Owner session authentication and first-account provisioning are described in [ADMIN_AUTH.md](ADMIN_AUTH.md). Other CMS content, image storage, frontend, deployment assets, proxy login limits, recovery, and full CI execution remain future work.
+The repository started as a minimal Spring Boot application (`BackendApplication`) with one context-load test and a Maven build. The `pom.xml` baseline is Java 21 and Spring Boot 4.1.1, with Spring Web MVC, Security, Data JPA, Validation, Flyway/PostgreSQL support, PostgreSQL runtime driver, DevTools, and Spring Boot test starters. The backend foundation provides local/test/production database configuration, fast isolated H2 tests, and a separate PostgreSQL Testcontainers validation layer; see [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md). The restaurant slice has a Flyway migration, public read routes, and authenticated owner editing for profile and hours; see [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md). Menu category/item and informational promotion management and public reads are described in [MENU_SLICE.md](MENU_SLICE.md) and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Owner session authentication and first-account provisioning are described in [ADMIN_AUTH.md](ADMIN_AUTH.md). Image storage, frontend, deployment assets, proxy login limits, recovery, and full CI execution remain future work.
 
 ## Product boundaries
 
@@ -81,9 +81,9 @@ Define a storage adapter independent of a final cloud vendor. Implement upload v
 
 ### I. Promotions
 
-Design owner-managed promotions with clear start/end timing, active state, display order, optional image, and public visibility rules. Define timezone and expiration behavior. Avoid implementing coupons, checkout discounts, or promotion redemption absent a real business requirement.
+Owner-managed informational promotions are implemented with optional local start/end times, active state, display order, public visibility rules, and timezone-aware boundaries. Image support and promotional redemption remain out of scope. Coupons, checkout discounts, and promo codes are excluded.
 
-**Exit:** current promotions can be published and expire predictably.
+**Exit:** current promotions can be published and expire predictably. **Status: implemented in backend slice; frontend consumption and deployment remain future work.**
 
 ### J. Public API
 

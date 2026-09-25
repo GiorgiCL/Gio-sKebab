@@ -15,7 +15,7 @@ An operator provisions the account exactly once using the application in non-web
 | `GET /api/admin/auth/me` | Requires the authenticated session; returns the account email, otherwise 401. |
 | `POST /api/admin/auth/logout` | CSRF required. Invalidates the session, clears its cookie, and returns 204. |
 
-Only the three documented public restaurant GET routes, public menu GET, and anonymous CSRF/login are publicly permitted. Other `/api/admin/**` requests require authentication; other routes remain denied by default. Owner content routes are documented in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md) and [MENU_SLICE.md](MENU_SLICE.md). Malformed, blank, or oversized login fields return a generic 400 problem response without echoing credentials. Passwords are limited to 72 UTF-8 bytes so BCrypt never silently truncates them. Spring Security's standard headers remain enabled. No password, hash, or session ID is returned by the API.
+Only the documented public restaurant, menu, and promotions GET routes plus anonymous CSRF/login are publicly permitted. Other `/api/admin/**` requests require authentication; other routes remain denied by default. Owner content routes are documented in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md), [MENU_SLICE.md](MENU_SLICE.md), and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Malformed, blank, or oversized login fields return a generic 400 problem response without echoing credentials. Passwords are limited to 72 UTF-8 bytes so BCrypt never silently truncates them. Spring Security's standard headers remain enabled. No password, hash, or session ID is returned by the API.
 
 ## Browser and deployment model
 
