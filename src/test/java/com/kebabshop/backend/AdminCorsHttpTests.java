@@ -33,5 +33,10 @@ class AdminCorsHttpTests {
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+        mvc.perform(options("/api/admin/opening-hours/special-dates/2026-09-25")
+                        .header("Origin", "https://admin.example.com")
+                        .header("Access-Control-Request-Method", "DELETE")
+                        .header("Access-Control-Request-Headers", "x-csrf-token"))
+                .andExpect(status().isOk());
     }
 }

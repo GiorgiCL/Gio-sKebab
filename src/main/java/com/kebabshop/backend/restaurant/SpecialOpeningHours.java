@@ -29,6 +29,13 @@ public class SpecialOpeningHours {
         this.closingTime = closingTime;
     }
 
+    public void replace(boolean isOpen, LocalTime openingTime, LocalTime closingTime) {
+        HoursRule.validate(isOpen, openingTime, closingTime);
+        this.isOpen = isOpen;
+        this.openingTime = openingTime;
+        this.closingTime = closingTime;
+    }
+
     public LocalDate getSpecialDate() { return specialDate; }
     public boolean isOpen() { return isOpen; }
     public LocalTime getOpeningTime() { return openingTime; }

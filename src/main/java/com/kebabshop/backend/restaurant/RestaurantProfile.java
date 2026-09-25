@@ -88,6 +88,23 @@ public class RestaurantProfile {
         this.facebookUrl = facebookUrl;
     }
 
+    public void replace(String displayName, String description, String address, String phone,
+                        String email, String googleMapsUrl, String woltUrl, String boltFoodUrl,
+                        String instagramUrl, String facebookUrl) {
+        RestaurantProfile replacement = new RestaurantProfile(displayName, description, address, phone,
+                email, googleMapsUrl, woltUrl, boltFoodUrl, instagramUrl, facebookUrl);
+        this.displayName = replacement.displayName;
+        this.description = replacement.description;
+        this.address = replacement.address;
+        this.phone = replacement.phone;
+        this.email = replacement.email;
+        this.googleMapsUrl = replacement.googleMapsUrl;
+        this.woltUrl = replacement.woltUrl;
+        this.boltFoodUrl = replacement.boltFoodUrl;
+        this.instagramUrl = replacement.instagramUrl;
+        this.facebookUrl = replacement.facebookUrl;
+    }
+
     private static void validateHttpsUrl(String value, boolean required) {
         if (value == null && !required) return;
         if (value == null) throw new IllegalArgumentException("Google Maps URL is required");

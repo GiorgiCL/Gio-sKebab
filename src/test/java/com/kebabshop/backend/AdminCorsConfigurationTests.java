@@ -25,7 +25,7 @@ class AdminCorsConfigurationTests {
                 .getCorsConfiguration(request);
         assertEquals("https://admin.example.com", config.getAllowedOrigins().getFirst());
         assertEquals(true, config.getAllowCredentials());
-        assertEquals(2, config.getAllowedMethods().size());
+        assertEquals(4, config.getAllowedMethods().size());
         assertThrows(IllegalArgumentException.class,
                 () -> security.corsConfigurationSource("http://admin.example.com", prod));
         assertThrows(IllegalArgumentException.class,

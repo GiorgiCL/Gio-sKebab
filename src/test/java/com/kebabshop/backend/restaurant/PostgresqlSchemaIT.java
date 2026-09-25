@@ -18,6 +18,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,6 +47,7 @@ class PostgresqlSchemaIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired RestaurantProfileRepository profiles;
     @Autowired AdminProvisioningService provisioning;
+    @Autowired RestaurantAdminService admin;
 
     @Test
     void flywayJpaAndPostgresqlConstraintsWorkTogether() throws SQLException {
@@ -83,5 +87,18 @@ class PostgresqlSchemaIT {
                 () -> jdbc.update("UPDATE admin_account SET password_hash = ' ' WHERE id = 1"));
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE admin_account SET enabled = NULL WHERE id = 1"));
+
+        var days = Arrays.stream(DayOfWeek.values())
+                .map(day -> new WeeklyDayRequest(day, day == DayOfWeek.FRIDAY,
+                        day == DayOfWeek.FRIDAY ? LocalTime.NOON : null,
+                        day == DayOfWeek.FRIDAY ? LocalTime.of(18, 0) : null)).toList();
+        assertEquals(7, admin.replaceWeekly(new WeeklyScheduleRequest(days)).size());
+        assertEquals(7, admin.weeklySchedule().size());
+        LocalDate date = LocalDate.of(2027, 1, 1);
+        admin.createSpecial(new SpecialDateRequest(date, false, null, null));
+        assertEquals(2, admin.specialDates().size()); // The earlier V1 constraint check inserted one other date.
+        admin.replaceSpecial(date, new SpecialDateReplacementRequest(true, LocalTime.NOON, LocalTime.of(14, 0)));
+        admin.deleteSpecial(date);
+        assertEquals(1, admin.specialDates().size());
     }
 }
