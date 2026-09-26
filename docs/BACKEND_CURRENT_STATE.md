@@ -1,5 +1,17 @@
 # Backend current state and frontend handoff
 
+## Localization update (Flyway V6)
+
+Public content supports exactly `lt`, `en`, `ru`, and `ka`. Lithuanian is canonical. `GET /api/public/restaurant`, `/api/public/menu`, and `/api/public/promotions` accept optional `?lang=lt|en|ru|ka`; omitted means `lt`, and unsupported or empty values return 400. Each response keeps its existing single resolved text fields. Resolution is field by field: requested nonblank value, then Lithuanian canonical value. Optional promotion description can remain null. No translations are generated. Opening hours and status do not use a language parameter.
+
+V6 adds one translation table per parent: `restaurant_profile_translation`, `menu_category_translation`, `menu_item_translation`, and `promotion_translation`. These contain only en/ru/ka text, with a parent/locale primary key, locale and content checks, and a cascading foreign key. Existing Lithuanian content remains in its original required columns, so V6 does not rewrite or discard it. Hibernate continues to validate the existing entities against the migrated schema.
+
+Localized fields are profile `displayName` and `description`, category `name`, item `name` and `description`, and promotion `title` and `description`. Prices, availability, flags, order, image URL, address, phone, email, external URLs, hours, dates, and timezone stay shared across languages.
+
+Admin GET responses retain top-level Lithuanian fields and add `translations`, keyed by locale. Values are typed objects: profile `{displayName, description}`, category `{name}`, item `{name, description}`, and promotion `{title, description}`. The returned `lt` entry reflects the canonical fields. POST/PUT requests retain their existing required Lithuanian fields and may include `translations`. A present map fully replaces en/ru/ka entries; omitting it preserves them for older clients. To clear a locale, omit it from a present map. A supplied `lt` entry must match canonical fields. Blank optional translated fields clear the field and trigger Lithuanian fallback. Fully blank translation entries are removed. Unsupported locale keys and malformed entries return 400. Names/titles retain a 160-character limit; profile and item descriptions use 1000, promotion descriptions 500. Existing Lithuanian required-field and business validation remains in force. Translation writes share the entity transaction.
+
+Frontend integration: send the selected language as `lang` on the three localized public routes, and render the returned fields directly. The CMS should load each entity's `translations` map and send the complete desired map alongside the canonical Lithuanian and other business fields on save. Existing requests without `lang` and older admin writes without `translations` continue to work.
+
 This document is the concise checkpoint for frontend and backend work. It describes the implemented backend as it exists in this repository. Slice-level behavior and setup instructions remain in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md), [ADMIN_AUTH.md](ADMIN_AUTH.md), [MENU_SLICE.md](MENU_SLICE.md), [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md), and [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md).
 
 ## Architecture and stack
@@ -17,8 +29,9 @@ Domain packages under `com.kebabshop.backend` are `auth`, `restaurant`, `menu`, 
 | V3 `menu` | Ordered categories and menu items, EUR price, active/available flags, category relationship. |
 | V4 `promotions` | Informational promotions, active window, display order. |
 | V5 `menu_featured_and_image_url` | Non-null `featured` defaulting false and nullable `image_url` up to 2048 characters. |
+| V6 `content_translations` | en/ru/ka text for owner-managed public content; Lithuanian remains canonical in existing columns. |
 
-Migrations V1–V5 are present and covered by the PostgreSQL integration test. Do not edit applied migrations; add a new migration for future schema changes.
+Migrations V1–V6 are present and covered by the PostgreSQL integration test. Do not edit applied migrations; add a new migration for future schema changes.
 
 ## Public API
 

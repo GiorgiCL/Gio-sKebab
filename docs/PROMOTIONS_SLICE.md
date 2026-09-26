@@ -22,4 +22,6 @@ Owner routes under `/api/admin/promotions` require an authenticated session. POS
 | `PUT /api/admin/promotions/{id}` | Fully replaces all editable fields. |
 | `DELETE /api/admin/promotions/{id}` | Deletes with 204. |
 
-Missing IDs return 404. Invalid or malformed requests, including invalid local timestamps, return a generic 400 problem response. PostgreSQL constraint conflicts return a generic 409. Authentication and CSRF behavior follows [ADMIN_AUTH.md](ADMIN_AUTH.md). Fast H2 tests cover endpoint behavior and deterministic time; `mvnw verify` migrates V1–V5 and checks selected schema constraints on disposable PostgreSQL 17.9, including the V4 promotion constraints.
+Flyway V6 adds en/ru/ka promotion titles and optional descriptions. Public GET accepts `?lang=lt|en|ru|ka` and resolves each field to Lithuanian when untranslated. Admin DTOs add a `translations` map with `{title, description}` values. A supplied map replaces non-Lithuanian entries; an omitted map preserves them. Dates, active state, order, and timezone remain shared.
+
+Missing IDs return 404. Invalid or malformed requests, including invalid local timestamps, return a generic 400 problem response. PostgreSQL constraint conflicts return a generic 409. Authentication and CSRF behavior follows [ADMIN_AUTH.md](ADMIN_AUTH.md). Fast H2 tests cover endpoint behavior and deterministic time; `mvnw verify` migrates V1–V6 and checks selected schema constraints on disposable PostgreSQL 17.9.

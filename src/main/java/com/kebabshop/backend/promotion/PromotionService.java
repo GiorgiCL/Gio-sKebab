@@ -13,6 +13,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.kebabshop.backend.ContentTranslations;
+import com.kebabshop.backend.ContentTranslations.Kind;
+import com.kebabshop.backend.ContentTranslations.Text;
 
 @Service
 class PromotionService {
@@ -23,32 +28,42 @@ class PromotionService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final ZoneId zone;
+    private final ContentTranslations translations;
 
-    PromotionService(PromotionRepository promotions, EntityManager entityManager, Clock clock, ZoneId restaurantZone) {
+    PromotionService(PromotionRepository promotions, EntityManager entityManager, Clock clock, ZoneId restaurantZone,
+                     ContentTranslations translations) {
         this.promotions = promotions;
         this.entityManager = entityManager;
         this.clock = clock;
         this.zone = restaurantZone;
+        this.translations = translations;
     }
 
     @Transactional(readOnly = true)
-    PublicPromotionsResponse publicPromotions() {
+    PublicPromotionsResponse publicPromotions(String lang) {
+        lang = ContentTranslations.locale(lang);
+        final String locale = lang;
+        var all = translations.all(Kind.PROMOTION);
         Instant now = clock.instant();
         var visible = promotions.findAll().stream().filter(Promotion::isActive)
                 .filter(promotion -> promotion.getStartsAt() == null || !now.isBefore(promotion.getStartsAt()))
                 .filter(promotion -> promotion.getEndsAt() == null || now.isBefore(promotion.getEndsAt()))
-                .sorted(ORDER).map(promotion -> PublicPromotion.from(promotion, zone)).toList();
+                .sorted(ORDER).map(promotion -> PublicPromotion.from(promotion, zone,
+                        ContentTranslations.resolve(locale, new Text(promotion.getTitle(), promotion.getDescription()),
+                                all.getOrDefault(promotion.getId(), Map.of())))).toList();
         return new PublicPromotionsResponse(zone.getId(), visible);
     }
 
     @Transactional(readOnly = true)
     List<PromotionResponse> list() {
-        return promotions.findAll().stream().sorted(ORDER).map(promotion -> PromotionResponse.from(promotion, zone)).toList();
+        var all = translations.all(Kind.PROMOTION);
+        return promotions.findAll().stream().sorted(ORDER).map(promotion -> PromotionResponse.from(promotion, zone,
+                all.getOrDefault(promotion.getId(), Map.of()))).toList();
     }
 
     @Transactional(readOnly = true)
     PromotionResponse get(Long id) {
-        return PromotionResponse.from(requirePromotion(id), zone);
+        return PromotionResponse.from(requirePromotion(id), zone, translations.forId(Kind.PROMOTION, id));
     }
 
     @Transactional
@@ -57,8 +72,10 @@ class PromotionService {
                 toInstant(request.startsAt()), toInstant(request.endsAt()), request.displayOrder());
         entityManager.persist(promotion);
         entityManager.flush();
+        translations.replace(Kind.PROMOTION, promotion.getId(), texts(request.translations()),
+                new Text(promotion.getTitle(), promotion.getDescription()));
         entityManager.refresh(promotion);
-        return PromotionResponse.from(promotion, zone);
+        return PromotionResponse.from(promotion, zone, translations.forId(Kind.PROMOTION, promotion.getId()));
     }
 
     @Transactional
@@ -67,8 +84,10 @@ class PromotionService {
         promotion.replace(request.title(), request.description(), request.active(),
                 toInstant(request.startsAt()), toInstant(request.endsAt()), request.displayOrder());
         entityManager.flush();
+        translations.replace(Kind.PROMOTION, id, texts(request.translations()),
+                new Text(promotion.getTitle(), promotion.getDescription()));
         entityManager.refresh(promotion);
-        return PromotionResponse.from(promotion, zone);
+        return PromotionResponse.from(promotion, zone, translations.forId(Kind.PROMOTION, id));
     }
 
     @Transactional
@@ -93,5 +112,15 @@ class PromotionService {
     private Promotion requirePromotion(Long id) {
         return promotions.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Promotion does not exist"));
+    }
+
+    private Map<String, Text> texts(Map<String, PromotionTranslation> input) {
+        if (input == null) return null;
+        var result = new LinkedHashMap<String, Text>();
+        input.forEach((locale, value) -> {
+            if (value == null) throw new IllegalArgumentException("Translation must be an object");
+            result.put(locale, new Text(value.title(), value.description()));
+        });
+        return result;
     }
 }

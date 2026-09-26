@@ -12,6 +12,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
+import com.kebabshop.backend.ContentTranslations;
+import com.kebabshop.backend.ContentTranslations.Kind;
+import com.kebabshop.backend.ContentTranslations.Text;
 
 @Service
 class RestaurantAdminService {
@@ -19,18 +25,21 @@ class RestaurantAdminService {
     private final WeeklyOpeningHoursRepository weekly;
     private final SpecialOpeningHoursRepository special;
     private final EntityManager entityManager;
+    private final ContentTranslations translations;
 
     RestaurantAdminService(RestaurantProfileRepository profiles, WeeklyOpeningHoursRepository weekly,
-                           SpecialOpeningHoursRepository special, EntityManager entityManager) {
+                           SpecialOpeningHoursRepository special, EntityManager entityManager,
+                           ContentTranslations translations) {
         this.profiles = profiles;
         this.weekly = weekly;
         this.special = special;
         this.entityManager = entityManager;
+        this.translations = translations;
     }
 
     @Transactional(readOnly = true)
     RestaurantResponse profile() {
-        return RestaurantResponse.from(profiles.findById((short) 1).orElseThrow(() ->
+        return response(profiles.findById((short) 1).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Restaurant profile is not configured")));
     }
 
@@ -53,8 +62,10 @@ class RestaurantAdminService {
             entityManager.persist(profile);
         }
         entityManager.flush();
+        translations.replace(Kind.PROFILE, 1, texts(request.translations()),
+                new Text(profile.getDisplayName(), profile.getDescription()));
         entityManager.refresh(profile);
-        return new ProfileResult(RestaurantResponse.from(profile), existing.isEmpty());
+        return new ProfileResult(response(profile), existing.isEmpty());
     }
 
     @Transactional(readOnly = true)
@@ -126,4 +137,22 @@ class RestaurantAdminService {
     }
 
     record ProfileResult(RestaurantResponse response, boolean created) {}
+
+    private RestaurantResponse response(RestaurantProfile profile) {
+        var all = ContentTranslations.withCanonical(new Text(profile.getDisplayName(), profile.getDescription()),
+                translations.forId(Kind.PROFILE, 1));
+        var dto = all.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                entry -> new ProfileTranslation(entry.getValue().first(), entry.getValue().description())));
+        return RestaurantResponse.from(profile, profile.getDisplayName(), profile.getDescription(), dto);
+    }
+
+    private Map<String, Text> texts(Map<String, ProfileTranslation> input) {
+        if (input == null) return null;
+        var result = new LinkedHashMap<String, Text>();
+        input.forEach((locale, value) -> {
+            if (value == null) throw new IllegalArgumentException("Translation must be an object");
+            result.put(locale, new Text(value.displayName(), value.description()));
+        });
+        return result;
+    }
 }

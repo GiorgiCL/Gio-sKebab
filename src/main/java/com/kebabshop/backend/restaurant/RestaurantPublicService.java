@@ -12,6 +12,9 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import com.kebabshop.backend.ContentTranslations;
+import com.kebabshop.backend.ContentTranslations.Kind;
+import com.kebabshop.backend.ContentTranslations.Text;
 
 @Service
 @Transactional(readOnly = true)
@@ -21,18 +24,25 @@ class RestaurantPublicService {
     private final SpecialOpeningHoursRepository specialHours;
     private final Clock clock;
     private final ZoneId zone;
+    private final ContentTranslations translations;
 
     RestaurantPublicService(RestaurantProfileRepository profiles, WeeklyOpeningHoursRepository weeklyHours,
-                            SpecialOpeningHoursRepository specialHours, Clock clock, ZoneId restaurantZone) {
+                            SpecialOpeningHoursRepository specialHours, Clock clock, ZoneId restaurantZone,
+                            ContentTranslations translations) {
         this.profiles = profiles;
         this.weeklyHours = weeklyHours;
         this.specialHours = specialHours;
         this.clock = clock;
         this.zone = restaurantZone;
+        this.translations = translations;
     }
 
-    RestaurantResponse restaurant() {
-        return RestaurantResponse.from(requireProfile());
+    RestaurantResponse restaurant(String lang) {
+        lang = ContentTranslations.locale(lang);
+        var profile = requireProfile();
+        var text = ContentTranslations.resolve(lang, new Text(profile.getDisplayName(), profile.getDescription()),
+                translations.forId(Kind.PROFILE, 1));
+        return RestaurantResponse.from(profile, text.first(), text.description(), null);
     }
 
     OpeningHoursResponse openingHours() {

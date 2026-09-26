@@ -10,6 +10,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+
+record ProfileTranslation(String displayName, String description) {}
 
 record ProfileRequest(
         @NotBlank @Size(max = 160) String displayName,
@@ -21,7 +24,8 @@ record ProfileRequest(
         @Size(max = 2048) String woltUrl,
         @Size(max = 2048) String boltFoodUrl,
         @Size(max = 2048) String instagramUrl,
-        @Size(max = 2048) String facebookUrl) {}
+        @Size(max = 2048) String facebookUrl,
+        Map<String, ProfileTranslation> translations) {}
 
 record WeeklyScheduleRequest(@NotNull @Size(min = 7, max = 7) List<@NotNull @Valid WeeklyDayRequest> days) {}
 

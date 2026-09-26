@@ -3,6 +3,7 @@ package com.kebabshop.backend.restaurant;
 import jakarta.persistence.EntityManagerFactory;
 import com.kebabshop.backend.auth.AdminProvisioningService;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,8 +57,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("5", flyway.info().current().getVersion().toString());
-        assertEquals(5, flyway.info().applied().length);
+        assertEquals("6", flyway.info().current().getVersion().toString());
+        assertEquals(6, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -145,5 +146,83 @@ class PostgresqlSchemaIT {
                 () -> jdbc.update("INSERT INTO promotion (title, active, starts_at, ends_at, display_order, created_at, updated_at) "
                         + "VALUES ('Invalid window', TRUE, TIMESTAMPTZ '2026-09-26 10:00:00+00', "
                         + "TIMESTAMPTZ '2026-09-25 10:00:00+00', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"));
+
+        assertEquals("Food", jdbc.queryForObject("SELECT name FROM menu_category WHERE id = ?", String.class, categoryId));
+        assertEquals("Kebab", jdbc.queryForObject("SELECT name FROM menu_item WHERE category_id = ?", String.class, categoryId));
+        jdbc.update("INSERT INTO menu_category_translation (category_id, locale, name) VALUES (?, 'en', 'Food')", categoryId);
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO menu_category_translation (category_id, locale, name) VALUES (?, 'en', 'Other')", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO menu_category_translation (category_id, locale, name) VALUES (?, 'de', 'Essen')", categoryId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO menu_item_translation (item_id, locale, name) VALUES (999999, 'en', 'Missing')"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO menu_item_translation (item_id, locale, name) "
+                        + "SELECT id, 'ru', ' ' FROM menu_item WHERE category_id = ?", categoryId));
+        jdbc.update("INSERT INTO menu_item_translation (item_id, locale, description) "
+                + "SELECT id, 'ru', 'Tasty' FROM menu_item WHERE category_id = ?", categoryId);
+        assertEquals("Kebab", jdbc.queryForObject("SELECT name FROM menu_item WHERE category_id = ?", String.class, categoryId));
+
+        jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) "
+                + "VALUES (1, 'en', 'Fresh food in English')");
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) "
+                        + "VALUES (1, 'en', 'Duplicate')"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) "
+                        + "VALUES (1, 'lt', 'Canonical belongs in profile')"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) "
+                        + "VALUES (1, 'ka', ' ')"));
+        assertEquals("Fresh food", jdbc.queryForObject(
+                "SELECT description FROM restaurant_profile WHERE id = 1", String.class));
+
+        jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
+                + "SELECT id, 'ka', 'Offer' FROM promotion");
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
+                        + "SELECT id, 'ka', 'Duplicate' FROM promotion"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
+                        + "SELECT id, 'de', 'Unsupported' FROM promotion"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
+                        + "SELECT id, 'ru', ' ' FROM promotion"));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
+                        + "VALUES (999999, 'en', 'Missing parent')"));
+        assertEquals("Open ended", jdbc.queryForObject("SELECT title FROM promotion", String.class));
+    }
+
+    @Test
+    void existingContentSurvivesPostgresqlUpgradeFromV5() {
+        String schema = "localization_upgrade";
+        Flyway.configure().dataSource(dataSource).schemas(schema).locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("5")).load().migrate();
+        jdbc.update("INSERT INTO localization_upgrade.restaurant_profile "
+                + "(id, display_name, description, address, phone, google_maps_url, created_at, updated_at) "
+                + "VALUES (1, 'Gio', 'Original description', 'Vilnius', '123', 'https://example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO localization_upgrade.menu_category (name, display_order, active, created_at, updated_at) "
+                + "VALUES ('Kebabai', 0, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO localization_upgrade.menu_item "
+                + "(category_id, name, description, price_eur, active, available, display_order, created_at, updated_at) "
+                + "SELECT id, 'Kebabas', 'Fresh', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP "
+                + "FROM localization_upgrade.menu_category");
+        jdbc.update("INSERT INTO localization_upgrade.promotion "
+                + "(title, active, display_order, created_at, updated_at) "
+                + "VALUES ('Offer', TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        var upgraded = Flyway.configure().dataSource(dataSource).schemas(schema)
+                .locations("classpath:db/migration").load();
+        upgraded.migrate();
+
+        assertEquals("6", upgraded.info().current().getVersion().toString());
+        assertEquals("Original description", jdbc.queryForObject(
+                "SELECT description FROM localization_upgrade.restaurant_profile WHERE id = 1", String.class));
+        assertEquals("Kebabai", jdbc.queryForObject("SELECT name FROM localization_upgrade.menu_category", String.class));
+        assertEquals("Fresh", jdbc.queryForObject("SELECT description FROM localization_upgrade.menu_item", String.class));
+        assertEquals("Offer", jdbc.queryForObject("SELECT title FROM localization_upgrade.promotion", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM localization_upgrade.menu_item_translation", Integer.class));
     }
 }

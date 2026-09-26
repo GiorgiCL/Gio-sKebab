@@ -24,11 +24,13 @@ These restaurant read requests are unauthenticated; the menu read route is docum
 
 Other routes remain denied by default; `/api/admin/**` requires owner authentication as described in [ADMIN_AUTH.md](ADMIN_AUTH.md). The owner can edit the restaurant profile and hours through the admin API below. Menu and informational promotion workflows are implemented; menu image support is currently an optional URL reference only, with no upload/storage workflow. No production credentials or business seed data are embedded in migrations.
 
-The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1–V5 migrations, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
+Flyway V6 adds en/ru/ka profile display names and descriptions. Lithuanian remains in V1 columns. Public profile GET accepts `?lang=lt|en|ru|ka`, defaults to Lithuanian, and rejects unsupported values with 400. Admin profile GET adds `translations` entries shaped `{displayName, description}`. A supplied map replaces non-Lithuanian entries; an omitted map preserves them for older clients. Address, contacts, external links, and opening hours remain shared.
+
+The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1–V6 migrations, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
 
 ## Owner editing contract
 
-All routes below require an authenticated owner session; PUT, POST, and DELETE also require the session CSRF token. They use request/response DTOs and the existing V1 tables, with no new migration.
+All routes below require an authenticated owner session; PUT, POST, and DELETE also require the session CSRF token. They use request/response DTOs and the V1 profile/hours tables plus the V6 profile translation table.
 
 | Route | Semantics |
 | --- | --- |
