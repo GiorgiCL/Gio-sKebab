@@ -22,12 +22,16 @@ record ItemTranslation(String name, String description) {}
 
 record ItemRequest(@NotNull @Min(1) Long categoryId,
                    @NotBlank @Size(max = 160) String name,
-                   @NotBlank @Size(max = 1000) String description,
+                   @Size(max = 1000) String description,
                    @NotNull @DecimalMin("0.01") @Digits(integer = 8, fraction = 2) BigDecimal priceEur,
                    @NotNull Boolean active, @NotNull Boolean available,
                    @NotNull Boolean featured, @Size(max = 2048) String imageUrl,
                    @NotNull @Min(0) Integer displayOrder,
-                   Map<String, ItemTranslation> translations) {}
+                   Map<String, ItemTranslation> translations) {
+    ItemRequest {
+        if (description != null && description.isBlank()) description = null;
+    }
+}
 
 record CategoryResponse(Long id, String name, int displayOrder, boolean active,
                         Instant createdAt, Instant updatedAt, Map<String, CategoryTranslation> translations) {

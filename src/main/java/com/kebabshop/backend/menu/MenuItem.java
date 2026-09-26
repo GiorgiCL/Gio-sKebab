@@ -25,8 +25,8 @@ class MenuItem {
     @NotBlank @Size(max = 160)
     @Column(nullable = false, length = 160)
     private String name;
-    @NotBlank @Size(max = 1000)
-    @Column(nullable = false, length = 1000)
+    @Size(max = 1000)
+    @Column(length = 1000)
     private String description;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal priceEur;
@@ -55,8 +55,9 @@ class MenuItem {
 
     void replace(Long categoryId, String name, String description, BigDecimal priceEur,
                  boolean active, boolean available, boolean featured, String imageUrl, int displayOrder) {
+        if (description != null && description.isBlank()) description = null;
         if (categoryId == null || categoryId <= 0 || name == null || name.isBlank() || name.length() > 160
-                || description == null || description.isBlank() || description.length() > 1000
+                || description != null && description.length() > 1000
                 || priceEur == null || priceEur.signum() <= 0 || priceEur.precision() - priceEur.scale() > 8
                 || priceEur.scale() > 2 || displayOrder < 0) {
             throw new IllegalArgumentException("Invalid menu item");

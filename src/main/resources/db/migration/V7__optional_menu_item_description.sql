@@ -1,0 +1,1 @@
+ALTER TABLE menu_item ALTER COLUMN description DROP NOT NULL;

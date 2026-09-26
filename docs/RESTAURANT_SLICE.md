@@ -26,7 +26,7 @@ Other routes remain denied by default; `/api/admin/**` requires owner authentica
 
 Flyway V6 adds en/ru/ka profile display names and descriptions. Lithuanian remains in V1 columns. Public profile GET accepts `?lang=lt|en|ru|ka`, defaults to Lithuanian, and rejects unsupported values with 400. Admin profile GET adds `translations` entries shaped `{displayName, description}`. A supplied map replaces non-Lithuanian entries; an omitted map preserves them for older clients. Address, contacts, external links, and opening hours remain shared.
 
-The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1–V6 migrations, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
+The fast tests run Flyway and JPA against isolated H2 databases and cover this contract, schedule precedence, timezone conversion, missing data, and security. A separate PostgreSQL Testcontainers integration test checks V1–V7 migrations, JPA schema validation, and selected database constraints on the production database engine. See [BACKEND_FOUNDATION.md](BACKEND_FOUNDATION.md) for commands and the Docker prerequisite.
 
 ## Owner editing contract
 

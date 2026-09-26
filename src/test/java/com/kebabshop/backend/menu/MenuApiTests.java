@@ -274,6 +274,73 @@ class MenuApiTests {
     }
 
     @Test
+    void optionalDescriptionCanBeOmittedClearedAndRestored() throws Exception {
+        MockHttpSession session = ownerSession();
+        long categoryId = createCategory(session, "Drinks", 0, true);
+        String described = item(categoryId, "Kebab", "8.50", true, true, false,
+                "https://images.example.com/kebab.jpg", 0);
+        var created = mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json").content(described))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description").value("Fresh food"))
+                .andReturn();
+        long describedId = ((Number) JsonPath.read(created.getResponse().getContentAsString(), "$.id")).longValue();
+
+        String withoutDescription = item(categoryId, "Cola", "2.90", true, false, true, null, 1)
+                .replace("\"description\":\"Fresh food\",", "");
+        var omitted = mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json").content(withoutDescription))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.priceEur").value(2.90))
+                .andExpect(jsonPath("$.featured").value(true))
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+        long omittedId = ((Number) JsonPath.read(omitted.getResponse().getContentAsString(), "$.id")).longValue();
+        assertEquals(null, jdbc.queryForObject("SELECT description FROM menu_item WHERE id = ?", String.class, omittedId));
+
+        String blankDescription = item(categoryId, "Sprite", "2.90", true, true, 2)
+                .replace("\"description\":\"Fresh food\"", "\"description\":\"   \"");
+        mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json").content(blankDescription))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()));
+
+        mvc.perform(put("/api/admin/menu/items/" + describedId).session(session).with(csrf())
+                        .contentType("application/json").content(described))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Fresh food"));
+        mvc.perform(put("/api/admin/menu/items/" + describedId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(described.replace("Fresh food", "Different text")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Different text"));
+        mvc.perform(put("/api/admin/menu/items/" + describedId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(described.replace("\"description\":\"Fresh food\"", "\"description\":null")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.imageUrl").value("https://images.example.com/kebab.jpg"));
+        mvc.perform(put("/api/admin/menu/items/" + omittedId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(withoutDescription.replace("\"name\":\"Cola\"", "\"name\":\"Cola\",\"description\":\"New text\"")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("New text"))
+                .andExpect(jsonPath("$.featured").value(true))
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.displayOrder").value(1));
+        mvc.perform(get("/api/public/menu?lang=lt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[0].items[0].description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.categories[0].items[1].description").value("New text"));
+        mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json").content(item(categoryId, " ", "8.50", true, true, 3)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(categoryId, "Too long", "8.50", true, true, 3)
+                                .replace("Fresh food", "x".repeat(1001))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void v5SchemaDefaultsFeaturedToFalseAndAllowsNullImageUrlOnH2() throws Exception {
         MockHttpSession session = ownerSession();
         long categoryId = createCategory(session, "Food", 0, true);

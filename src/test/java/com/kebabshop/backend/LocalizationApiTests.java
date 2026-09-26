@@ -168,4 +168,65 @@ class LocalizationApiTests {
                                 + "\"displayOrder\":0,\"translations\":{\"de\":{\"title\":\"Bad\"}}}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void optionalItemDescriptionsResolveIndependentlyFromTranslatedNames() throws Exception {
+        var session = owner();
+        jdbc.update("INSERT INTO menu_category (name, display_order, active, created_at, updated_at) "
+                + "VALUES ('Gėrimai', 0, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        Long category = jdbc.queryForObject("SELECT MAX(id) FROM menu_category", Long.class);
+        String base = "{\"categoryId\":" + category + ",\"name\":\"Gėrimas\",\"priceEur\":2.90,"
+                + "\"active\":true,\"available\":true,\"featured\":false,\"displayOrder\":0";
+        String namesOnly = "\"translations\":{\"en\":{\"name\":\"Drink\"},"
+                + "\"ru\":{\"name\":\"Napitok\"},\"ka\":{\"name\":\"Sasmeli\"}}";
+        var created = mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                        .contentType("application/json").content(base + "," + namesOnly + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.translations.lt.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.translations.en.description").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+        long id = ((Number) com.jayway.jsonpath.JsonPath.read(created.getResponse().getContentAsString(), "$.id")).longValue();
+        mvc.perform(get("/api/public/menu?lang=en"))
+                .andExpect(jsonPath("$.categories[0].items[0].name").value("Drink"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/public/menu?lang=ru"))
+                .andExpect(jsonPath("$.categories[0].items[0].name").value("Napitok"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/public/menu?lang=ka"))
+                .andExpect(jsonPath("$.categories[0].items[0].name").value("Sasmeli"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value(org.hamcrest.Matchers.nullValue()));
+
+        mvc.perform(put("/api/admin/menu/items/" + id).session(session).with(csrf())
+                        .contentType("application/json").content(base + ",\"description\":\"Lietuviškas tekstas\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.translations.en.name").value("Drink"));
+        for (String lang : new String[] {"en", "ru", "ka"}) {
+            mvc.perform(get("/api/public/menu?lang=" + lang))
+                    .andExpect(jsonPath("$.categories[0].items[0].description").value("Lietuviškas tekstas"));
+        }
+
+        String withEnglishDescription = "\"translations\":{\"en\":{\"name\":\"Drink\",\"description\":\"English text\"},"
+                + "\"ru\":{\"name\":\"Napitok\"},\"ka\":{\"name\":\"Sasmeli\"}}";
+        mvc.perform(put("/api/admin/menu/items/" + id).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(base + ",\"description\":\"Lietuviškas tekstas\"," + withEnglishDescription + "}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/public/menu?lang=en"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value("English text"));
+        mvc.perform(get("/api/public/menu?lang=ru"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value("Lietuviškas tekstas"));
+
+        mvc.perform(put("/api/admin/menu/items/" + id).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(base + ",\"description\":\"   \"," + withEnglishDescription + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/public/menu?lang=en"))
+                .andExpect(jsonPath("$.categories[0].items[0].description").value("English text"));
+        for (String lang : new String[] {"lt", "ru", "ka"}) {
+            mvc.perform(get("/api/public/menu?lang=" + lang))
+                    .andExpect(jsonPath("$.categories[0].items[0].description").value(org.hamcrest.Matchers.nullValue()));
+        }
+    }
 }

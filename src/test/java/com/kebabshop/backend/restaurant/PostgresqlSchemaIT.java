@@ -57,8 +57,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("6", flyway.info().current().getVersion().toString());
-        assertEquals(6, flyway.info().applied().length);
+        assertEquals("7", flyway.info().current().getVersion().toString());
+        assertEquals(7, flyway.info().applied().length);
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -114,6 +114,12 @@ class PostgresqlSchemaIT {
                         + "display_order, created_at, updated_at) "
                         + "VALUES (?, 'Kebab', 'Fresh food', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 categoryId);
+        assertEquals("Fresh food", jdbc.queryForObject("SELECT description FROM menu_item WHERE name = 'Kebab'", String.class));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE menu_item SET description = ' ' WHERE name = 'Kebab'"));
+        jdbc.update("UPDATE menu_item SET description = NULL WHERE name = 'Kebab'");
+        assertEquals(null, jdbc.queryForObject("SELECT description FROM menu_item WHERE name = 'Kebab'", String.class));
+        jdbc.update("UPDATE menu_item SET description = 'Fresh food' WHERE name = 'Kebab'");
         assertEquals(false, jdbc.queryForObject("SELECT featured FROM menu_item WHERE category_id = ?", Boolean.class, categoryId));
         assertEquals(null, jdbc.queryForObject("SELECT image_url FROM menu_item WHERE category_id = ?", String.class, categoryId));
         assertThrows(DataIntegrityViolationException.class,
@@ -161,6 +167,10 @@ class PostgresqlSchemaIT {
                         + "SELECT id, 'ru', ' ' FROM menu_item WHERE category_id = ?", categoryId));
         jdbc.update("INSERT INTO menu_item_translation (item_id, locale, description) "
                 + "SELECT id, 'ru', 'Tasty' FROM menu_item WHERE category_id = ?", categoryId);
+        jdbc.update("INSERT INTO menu_item_translation (item_id, locale, name) "
+                + "SELECT id, 'ka', 'Translated name' FROM menu_item WHERE name = 'Kebab'");
+        assertEquals(null, jdbc.queryForObject("SELECT description FROM menu_item_translation "
+                + "WHERE locale = 'ka' AND item_id = (SELECT id FROM menu_item WHERE name = 'Kebab')", String.class));
         assertEquals("Kebab", jdbc.queryForObject("SELECT name FROM menu_item WHERE category_id = ?", String.class, categoryId));
 
         jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) "
@@ -192,6 +202,14 @@ class PostgresqlSchemaIT {
                 () -> jdbc.update("INSERT INTO promotion_translation (promotion_id, locale, title) "
                         + "VALUES (999999, 'en', 'Missing parent')"));
         assertEquals("Open ended", jdbc.queryForObject("SELECT title FROM promotion", String.class));
+
+        Long drinksId = jdbc.queryForObject("INSERT INTO menu_category "
+                + "(name, display_order, active, created_at, updated_at) "
+                + "VALUES ('Drinks', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id", Long.class);
+        jdbc.update("INSERT INTO menu_item (category_id, name, price_eur, active, available, "
+                + "display_order, created_at, updated_at) VALUES (?, 'Cola', 2.90, TRUE, TRUE, 0, "
+                + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", drinksId);
+        assertEquals(null, jdbc.queryForObject("SELECT description FROM menu_item WHERE name = 'Cola'", String.class));
     }
 
     @Test
@@ -216,7 +234,7 @@ class PostgresqlSchemaIT {
                 .locations("classpath:db/migration").load();
         upgraded.migrate();
 
-        assertEquals("6", upgraded.info().current().getVersion().toString());
+        assertEquals("7", upgraded.info().current().getVersion().toString());
         assertEquals("Original description", jdbc.queryForObject(
                 "SELECT description FROM localization_upgrade.restaurant_profile WHERE id = 1", String.class));
         assertEquals("Kebabai", jdbc.queryForObject("SELECT name FROM localization_upgrade.menu_category", String.class));
