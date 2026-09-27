@@ -105,6 +105,33 @@ class RestaurantPublicApiTests {
                 .andExpect(jsonPath("$.displayName").value("Test Restaurant"))
                 .andExpect(jsonPath("$.woltUrl").value("https://wolt.example.com/test"))
                 .andExpect(jsonPath("$.id").doesNotExist());
+        for (String locale : new String[] {"en", "ru", "ka"}) {
+            mvc.perform(get("/api/public/restaurant?lang=" + locale))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.description").value("Fresh food"));
+        }
+    }
+
+    @Test
+    void publicProfileUsesSuppliedDescriptionForEachRequestedLocale() throws Exception {
+        profile();
+        jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) VALUES "
+                + "(1, 'en', 'Kebabs and grilled dishes on Savanorių Avenue, with house-made sauces and Georgian flavours.'), "
+                + "(1, 'ru', 'Кебабы и блюда на гриле на проспекте Саванорю, с соусами собственного приготовления и грузинскими нотками.'), "
+                + "(1, 'ka', 'ქაბაბები და გრილზე მომზადებული კერძები სავანორიუს გამზირზე, ჩვენი მომზადებული სოუსებითა და ქართული გემოებით.')");
+
+        mvc.perform(get("/api/public/restaurant?lang=lt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Fresh food"));
+        mvc.perform(get("/api/public/restaurant?lang=en"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Kebabs and grilled dishes on Savanorių Avenue, with house-made sauces and Georgian flavours."));
+        mvc.perform(get("/api/public/restaurant?lang=ru"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Кебабы и блюда на гриле на проспекте Саванорю, с соусами собственного приготовления и грузинскими нотками."));
+        mvc.perform(get("/api/public/restaurant?lang=ka"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("ქაბაბები და გრილზე მომზადებული კერძები სავანორიუს გამზირზე, ჩვენი მომზადებული სოუსებითა და ქართული გემოებით."));
     }
 
     @Test

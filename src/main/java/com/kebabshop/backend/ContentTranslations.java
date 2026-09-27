@@ -16,6 +16,7 @@ public class ContentTranslations {
         PROFILE("restaurant_profile_translation", "profile_id", "display_name", 160, 1000),
         CATEGORY("menu_category_translation", "category_id", "name", 160, 0),
         ITEM("menu_item_translation", "item_id", "name", 160, 1000),
+        LUNCH_ITEM("lunch_menu_item_translation", "item_id", "name", 160, 1000),
         PROMOTION("promotion_translation", "promotion_id", "title", 160, 500);
 
         final String table, idColumn, firstColumn;

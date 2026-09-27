@@ -25,6 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class RestaurantHttpSemanticsTests {
+    @Test
+    void realHttpRejectsInvalidPublicLanguagesWithoutChangingAdminProtection() throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            assertEquals(400, get(client, "/api/public/menu?lang=de").statusCode());
+            assertEquals(400, get(client, "/api/public/promotions?lang=de").statusCode());
+            assertEquals(400, get(client, "/api/public/lunch-menu?lang=de").statusCode());
+            assertEquals(200, get(client, "/api/public/lunch-menu?lang=lt").statusCode());
+            assertEquals(401, get(client, "/api/admin/lunch-menu/items").statusCode());
+        }
+    }
+
     @DynamicPropertySource
     static void isolatedDatabase(DynamicPropertyRegistry registry) {
         String url = "jdbc:h2:mem:gio_kebab_http_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
