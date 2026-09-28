@@ -54,6 +54,24 @@ class LunchService {
     }
 
     @Transactional
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<LunchResponse> replaceManagedImage(Long id, String url, String publicId) {
+        var item = require(id);
+        String oldPublicId = item.replaceManagedImage(url, publicId);
+        entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                LunchResponse.from(item, translations.forId(Kind.LUNCH_ITEM, id)), oldPublicId);
+    }
+
+    @Transactional
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<LunchResponse> removeManagedImage(Long id) {
+        var item = require(id);
+        String oldPublicId = item.replaceManagedImage(null, null);
+        entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                LunchResponse.from(item, translations.forId(Kind.LUNCH_ITEM, id)), oldPublicId);
+    }
+
+    @Transactional
     LunchResponse create(LunchRequest request) {
         var item = new LunchMenuItem(request.dayOfWeek(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.displayOrder(), request.imageUrl());
@@ -66,21 +84,27 @@ class LunchService {
     }
 
     @Transactional
-    LunchResponse replace(Long id, LunchRequest request) {
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<LunchResponse> replace(Long id, LunchRequest request) {
         var item = require(id);
+        String oldImageUrl = item.getImageUrl();
+        String oldPublicId = item.getImagePublicId();
         item.replace(request.dayOfWeek(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.displayOrder(), request.imageUrl());
         entityManager.flush();
         translations.replace(Kind.LUNCH_ITEM, id, texts(request.translations()),
                 new Text(item.getName(), item.getDescription()));
         entityManager.refresh(item);
-        return item(id);
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                item(id), java.util.Objects.equals(oldImageUrl, item.getImageUrl()) ? null : oldPublicId);
     }
 
     @Transactional
-    void delete(Long id) {
-        items.delete(require(id));
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<Void> delete(Long id) {
+        var item = require(id);
+        String oldPublicId = item.getImagePublicId();
+        items.delete(item);
         entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(null, oldPublicId);
     }
 
     private LunchMenuItem require(Long id) {

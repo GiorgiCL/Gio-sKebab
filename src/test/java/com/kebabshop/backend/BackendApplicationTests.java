@@ -16,6 +16,9 @@ import java.sql.SQLException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -50,12 +53,16 @@ class BackendApplicationTests {
         try (var connection = dataSource.getConnection()) {
             assertEquals("jdbc:h2:mem:gio_kebab_test", connection.getMetaData().getURL().split(";")[0]);
         }
-        assertEquals(11, flyway.info().all().length);
+        assertEquals(13, flyway.info().all().length);
     }
 
     @Test
     void adminRoutesRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/admin/example"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/admin/menu/items/1/image").with(csrf()))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/admin/lunch-menu/items/1/image").with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 

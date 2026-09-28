@@ -3,6 +3,8 @@ package com.kebabshop.backend.menu;
 import com.jayway.jsonpath.JsonPath;
 import com.kebabshop.backend.auth.AdminAccountRepository;
 import com.kebabshop.backend.auth.AdminProvisioningService;
+import com.kebabshop.backend.image.ManagedImageStorage;
+import com.kebabshop.backend.image.ManagedImageStorage.ImageKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,10 +15,13 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -42,6 +47,33 @@ class MenuApiTests {
     @Autowired MenuCategoryRepository categories;
     @Autowired MenuItemRepository items;
     @Autowired JdbcTemplate jdbc;
+    @MockitoBean ManagedImageStorage imageStorage;
+
+    @Test
+    void standardUpdateAndDeleteCleanUpOnlyManagedImages() throws Exception {
+        var session = ownerSession();
+        long categoryId = createCategory(session, "Food", 0, true);
+        long changed = createItem(session, categoryId, "Changed", "8.50", true, true, 0);
+        jdbc.update("UPDATE menu_item SET image_url = ?, image_public_id = ? WHERE id = ?",
+                "https://res.cloudinary.com/demo/image/upload/old.jpg", "gios-kebab/menu/old", changed);
+
+        mvc.perform(put("/api/admin/menu/items/" + changed).session(session).with(csrf())
+                .contentType("application/json")
+                .content(item(categoryId, "Changed", "8.50", true, true, false,
+                        "https://images.example.com/owner.jpg", 0)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("https://images.example.com/owner.jpg"));
+        assertEquals(null, jdbc.queryForObject("SELECT image_public_id FROM menu_item WHERE id = ?", String.class, changed));
+        verify(imageStorage).delete(ImageKind.MENU, "gios-kebab/menu/old");
+
+        long deleted = createItem(session, categoryId, "Deleted", "8.50", true, true, 1);
+        jdbc.update("UPDATE menu_item SET image_url = ?, image_public_id = ? WHERE id = ?",
+                "https://res.cloudinary.com/demo/image/upload/deleted.jpg", "gios-kebab/menu/deleted", deleted);
+        mvc.perform(delete("/api/admin/menu/items/" + deleted).session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(imageStorage).delete(ImageKind.MENU, "gios-kebab/menu/deleted");
+        verify(imageStorage, never()).delete(ImageKind.MENU, "https://images.example.com/owner.jpg");
+    }
 
     @BeforeEach
     void reset() {

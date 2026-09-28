@@ -64,7 +64,7 @@ class PostgresqlSchemaIT {
         var upgraded = Flyway.configure().dataSource(dataSource).schemas(schema).locations("classpath:db/migration").load();
         upgraded.migrate();
 
-        assertEquals("11", upgraded.info().current().getVersion().toString());
+        assertEquals("13", upgraded.info().current().getVersion().toString());
         assertEquals(283277535, jdbc.queryForObject("SELECT checksum FROM " + schema + ".flyway_schema_history WHERE version = '10'", Integer.class));
         assertEquals("Kebabs and grilled dishes on Savanori\u0173 Avenue, with house-made sauces and Georgian flavours.",
                 jdbc.queryForObject("SELECT description FROM " + schema + ".restaurant_profile_translation WHERE locale = 'en'", String.class));
@@ -102,8 +102,14 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("11", flyway.info().current().getVersion().toString());
-        assertEquals(11, flyway.info().applied().length);
+        assertEquals("13", flyway.info().current().getVersion().toString());
+        assertEquals(13, flyway.info().applied().length);
+        for (String table : new String[]{"menu_item", "lunch_menu_item"}) {
+            assertEquals("YES", jdbc.queryForObject(
+                    "SELECT is_nullable FROM information_schema.columns "
+                            + "WHERE table_schema = current_schema() AND table_name = ? AND column_name = 'image_public_id'",
+                    String.class, table));
+        }
 
         RestaurantProfile profile = profiles.saveAndFlush(new RestaurantProfile("Container Restaurant",
                 "Fresh food", "1 Main Street", "+37060000000", null,
@@ -293,7 +299,7 @@ class PostgresqlSchemaIT {
                 .locations("classpath:db/migration").load();
         upgraded.migrate();
 
-        assertEquals("11", upgraded.info().current().getVersion().toString());
+        assertEquals("13", upgraded.info().current().getVersion().toString());
         assertEquals(283277535, jdbc.queryForObject("SELECT checksum FROM " + schema + ".flyway_schema_history WHERE version = '10'", Integer.class));
         assertEquals("Original description", jdbc.queryForObject(
                 "SELECT description FROM localization_upgrade.restaurant_profile WHERE id = 1", String.class));

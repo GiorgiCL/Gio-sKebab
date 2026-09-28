@@ -111,6 +111,24 @@ class MenuService {
     }
 
     @Transactional
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<ItemResponse> replaceManagedImage(Long id, String url, String publicId) {
+        var item = requireItem(id);
+        String oldPublicId = item.replaceManagedImage(url, publicId);
+        entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                ItemResponse.from(item, translations.forId(Kind.ITEM, id)), oldPublicId);
+    }
+
+    @Transactional
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<ItemResponse> removeManagedImage(Long id) {
+        var item = requireItem(id);
+        String oldPublicId = item.replaceManagedImage(null, null);
+        entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                ItemResponse.from(item, translations.forId(Kind.ITEM, id)), oldPublicId);
+    }
+
+    @Transactional
     ItemResponse createItem(ItemRequest request) {
         requireCategory(request.categoryId());
         var item = new MenuItem(request.categoryId(), request.name(), request.description(), request.priceEur(),
@@ -123,21 +141,28 @@ class MenuService {
     }
 
     @Transactional
-    ItemResponse replaceItem(Long id, ItemRequest request) {
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<ItemResponse> replaceItem(Long id, ItemRequest request) {
         var item = requireItem(id);
         requireCategory(request.categoryId());
+        String oldImageUrl = item.getImageUrl();
+        String oldPublicId = item.getImagePublicId();
         item.replace(request.categoryId(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.featured(), request.imageUrl(), request.displayOrder());
         entityManager.flush();
         translations.replace(Kind.ITEM, id, itemTexts(request.translations()), new Text(item.getName(), item.getDescription()));
         entityManager.refresh(item);
-        return ItemResponse.from(item, translations.forId(Kind.ITEM, id));
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(
+                ItemResponse.from(item, translations.forId(Kind.ITEM, id)),
+                java.util.Objects.equals(oldImageUrl, item.getImageUrl()) ? null : oldPublicId);
     }
 
     @Transactional
-    void deleteItem(Long id) {
-        items.delete(requireItem(id));
+    com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<Void> deleteItem(Long id) {
+        var item = requireItem(id);
+        String oldPublicId = item.getImagePublicId();
+        items.delete(item);
         entityManager.flush();
+        return new com.kebabshop.backend.image.ImageUploadCoordinator.ImageChange<>(null, oldPublicId);
     }
 
     private MenuCategory requireCategory(Long id) {

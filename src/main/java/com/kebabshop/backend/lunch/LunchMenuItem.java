@@ -27,6 +27,8 @@ class LunchMenuItem {
     private int displayOrder;
     @Column(length = 2048)
     private String imageUrl;
+    @Column(name = "image_public_id", length = 255)
+    private String imagePublicId;
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
     @Column(nullable = false)
@@ -53,7 +55,9 @@ class LunchMenuItem {
         this.active = active;
         this.available = available;
         this.displayOrder = displayOrder;
-        this.imageUrl = MenuItemImageUrls.normalize(imageUrl);
+        imageUrl = MenuItemImageUrls.normalize(imageUrl);
+        if (!java.util.Objects.equals(this.imageUrl, imageUrl)) this.imagePublicId = null;
+        this.imageUrl = imageUrl;
     }
 
     @PrePersist void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; }
@@ -68,6 +72,13 @@ class LunchMenuItem {
     boolean isAvailable() { return available; }
     int getDisplayOrder() { return displayOrder; }
     String getImageUrl() { return imageUrl; }
+    String getImagePublicId() { return imagePublicId; }
+    String replaceManagedImage(String imageUrl, String publicId) {
+        String oldPublicId = imagePublicId;
+        this.imageUrl = MenuItemImageUrls.normalize(imageUrl);
+        this.imagePublicId = publicId;
+        return oldPublicId;
+    }
     Instant getCreatedAt() { return createdAt; }
     Instant getUpdatedAt() { return updatedAt; }
 }

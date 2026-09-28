@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import com.kebabshop.backend.image.ImageUploadCoordinator;
+import com.kebabshop.backend.image.ManagedImageStorage.ImageKind;
 
 import java.net.URI;
 import java.util.List;
@@ -18,9 +22,11 @@ import java.util.List;
 @RequestMapping("/api/admin/menu")
 class MenuAdminController {
     private final MenuService service;
+    private final ImageUploadCoordinator images;
 
-    MenuAdminController(MenuService service) {
+    MenuAdminController(MenuService service, ImageUploadCoordinator images) {
         this.service = service;
+        this.images = images;
     }
 
     @GetMapping("/categories")
@@ -60,12 +66,22 @@ class MenuAdminController {
 
     @PutMapping("/items/{id}")
     ItemResponse replaceItem(@PathVariable Long id, @Valid @RequestBody ItemRequest request) {
-        return service.replaceItem(id, request);
+        return images.remove(ImageKind.MENU, () -> service.replaceItem(id, request));
+    }
+
+    @PostMapping("/items/{id}/image")
+    ItemResponse uploadItemImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return images.upload(ImageKind.MENU, file, stored -> service.replaceManagedImage(id, stored.url(), stored.publicId()));
+    }
+
+    @DeleteMapping("/items/{id}/image")
+    ItemResponse removeItemImage(@PathVariable Long id) {
+        return images.remove(ImageKind.MENU, () -> service.removeManagedImage(id));
     }
 
     @DeleteMapping("/items/{id}")
     ResponseEntity<Void> deleteItem(@PathVariable Long id) {
-        service.deleteItem(id);
+        images.remove(ImageKind.MENU, () -> service.deleteItem(id));
         return ResponseEntity.noContent().build();
     }
 }

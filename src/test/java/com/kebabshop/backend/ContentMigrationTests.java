@@ -52,7 +52,7 @@ class ContentMigrationTests {
         assertEquals("Dideli kebabai", jdbc.queryForObject("SELECT name FROM menu_category WHERE id = 42", String.class));
         assertEquals("Large Kebabs", jdbc.queryForObject("SELECT name FROM menu_category_translation WHERE category_id = 42 AND locale = 'en'", String.class));
         assertEquals("Большие кебабы", jdbc.queryForObject("SELECT name FROM menu_category_translation WHERE category_id = 42 AND locale = 'ru'", String.class));
-        assertEquals("დიდი ქაბაბები", jdbc.queryForObject("SELECT name FROM menu_category_translation WHERE category_id = 42 AND locale = 'ka'", String.class));
+        assertEquals("დიდი ქებაბები", jdbc.queryForObject("SELECT name FROM menu_category_translation WHERE category_id = 42 AND locale = 'ka'", String.class));
         assertEquals("Owner category", jdbc.queryForObject("SELECT name FROM menu_category WHERE id = 43", String.class));
         assertEquals("Build Your Own Kebab (Large)", jdbc.queryForObject("SELECT name FROM menu_category_translation WHERE category_id = 43", String.class));
         assertEquals(7, jdbc.queryForObject("SELECT display_order FROM menu_category WHERE id = 42", Integer.class));
@@ -72,7 +72,7 @@ class ContentMigrationTests {
         jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, display_name) VALUES (1, 'en', 'Gio''s Kebab EN')");
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
 
-        assertEquals("11", Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load()
+        assertEquals("13", Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load()
                 .info().current().getVersion().toString());
         assertEquals("Kebabs and grilled dishes on Savanorių Avenue, with house-made sauces and Georgian flavours.",
                 jdbc.queryForObject("SELECT description FROM restaurant_profile_translation WHERE locale = 'en'", String.class));
@@ -82,7 +82,7 @@ class ContentMigrationTests {
                 jdbc.queryForObject("SELECT display_name FROM restaurant_profile_translation WHERE locale = 'en'", String.class));
         assertEquals("Кебабы и блюда на гриле на проспекте Саванорю, с соусами собственного приготовления и грузинскими нотками.",
                 jdbc.queryForObject("SELECT description FROM restaurant_profile_translation WHERE locale = 'ru'", String.class));
-        assertEquals("ქაბაბები და გრილზე მომზადებული კერძები სავანორიუს გამზირზე, ჩვენი მომზადებული სოუსებითა და ქართული გემოებით.",
+        assertEquals("ქებაბები და გრილზე მომზადებული კერძები სავანორიუს გამზირზე, ჩვენი მომზადებული სოუსებითა და ქართული გემოებით.",
                 jdbc.queryForObject("SELECT description FROM restaurant_profile_translation WHERE locale = 'ka'", String.class));
         assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM restaurant_profile_translation WHERE profile_id = 1", Integer.class));
     }
@@ -109,6 +109,42 @@ class ContentMigrationTests {
                 "SELECT description FROM restaurant_profile_translation WHERE locale = 'en'", String.class));
         assertEquals("Lithuanian source", jdbc.queryForObject(
                 "SELECT description FROM restaurant_profile WHERE id = 1", String.class));
+    }
+
+    @Test
+    void v13CorrectsOnlyKnownGeorgianCopyAndPreservesOwnerEdits() {
+        var dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:gio_kebab_v13_georgian_copy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1", "sa", "");
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("12")).load().migrate();
+        var jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("INSERT INTO restaurant_profile (id, display_name, description, address, phone, google_maps_url, created_at, updated_at) "
+                + "VALUES (1, 'Gio', 'Original', 'Vilnius', '123', 'https://example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, description) VALUES "
+                + "(1, 'ka', 'Owner approved wording')");
+        jdbc.update("INSERT INTO menu_category (id, name, display_order, active, created_at, updated_at) VALUES "
+                + "(42, 'Dideli kebabai', 0, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                + "(43, 'Owner category', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO menu_category_translation (category_id, locale, name) VALUES "
+                + "(42, 'ka', 'დიდი ქაბაბები'), (43, 'ka', 'დიდი ქაბაბები')");
+        jdbc.update("INSERT INTO menu_item (id, category_id, name, price_eur, active, available, display_order, created_at, updated_at) VALUES "
+                + "(51, 42, 'Kebabas su vištienos krūtinėle', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                + "(52, 43, 'Owner product', 8.50, TRUE, TRUE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO menu_item_translation (item_id, locale, name) VALUES "
+                + "(51, 'ka', 'ქაბაბი ქათმის მკერდის ფილეთი'), (52, 'ka', 'ქაბაბი ქათმის მკერდის ფილეთი')");
+
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+
+        assertEquals("Owner approved wording", jdbc.queryForObject(
+                "SELECT description FROM restaurant_profile_translation WHERE locale = 'ka'", String.class));
+        assertEquals("დიდი ქებაბები", jdbc.queryForObject(
+                "SELECT name FROM menu_category_translation WHERE category_id = 42 AND locale = 'ka'", String.class));
+        assertEquals("დიდი ქაბაბები", jdbc.queryForObject(
+                "SELECT name FROM menu_category_translation WHERE category_id = 43 AND locale = 'ka'", String.class));
+        assertEquals("ქებაბი ქათმის მკერდის ფილით", jdbc.queryForObject(
+                "SELECT name FROM menu_item_translation WHERE item_id = 51 AND locale = 'ka'", String.class));
+        assertEquals("ქაბაბი ქათმის მკერდის ფილეთი", jdbc.queryForObject(
+                "SELECT name FROM menu_item_translation WHERE item_id = 52 AND locale = 'ka'", String.class));
     }
 
     @Test

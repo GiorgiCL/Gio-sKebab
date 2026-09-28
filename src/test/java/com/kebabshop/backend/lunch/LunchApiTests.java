@@ -3,6 +3,9 @@ package com.kebabshop.backend.lunch;
 import com.jayway.jsonpath.JsonPath;
 import com.kebabshop.backend.auth.AdminAccountRepository;
 import com.kebabshop.backend.auth.AdminProvisioningService;
+import com.kebabshop.backend.image.ManagedImageStorage;
+import com.kebabshop.backend.image.ManagedImageStorage.ImageKind;
+import com.kebabshop.backend.image.ManagedImageStorage.StoredImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,13 +13,20 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -37,6 +47,59 @@ class LunchApiTests {
     @Autowired AdminAccountRepository accounts;
     @Autowired AdminProvisioningService provisioning;
     @Autowired JdbcTemplate jdbc;
+    @MockitoBean ManagedImageStorage imageStorage;
+
+    @Test void lunchUploadReplaceAndRemovalKeepDatabaseAndStorageInSync() throws Exception {
+        var session = owner();
+        long id = create(session, lunch("MONDAY", "Lunch", 0, true, true, "https://images.example.com/owner.jpg"));
+        when(imageStorage.upload(eq(ImageKind.LUNCH), any(), eq("jpg"))).thenReturn(
+                new StoredImage("https://res.cloudinary.com/demo/first", "gios-kebab/lunch/first"),
+                new StoredImage("https://res.cloudinary.com/demo/second", "gios-kebab/lunch/second"));
+        var photo = new MockMultipartFile("file", "lunch.jpg", "image/jpeg",
+                new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff});
+
+        mvc.perform(multipart("/api/admin/lunch-menu/items/" + id + "/image").file(photo)
+                .session(session).with(csrf())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("https://res.cloudinary.com/demo/first"));
+        assertEquals("gios-kebab/lunch/first", jdbc.queryForObject(
+                "SELECT image_public_id FROM lunch_menu_item WHERE id = ?", String.class, id));
+        verify(imageStorage, never()).delete(ImageKind.LUNCH, "https://images.example.com/owner.jpg");
+
+        mvc.perform(multipart("/api/admin/lunch-menu/items/" + id + "/image").file(photo)
+                .session(session).with(csrf())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("https://res.cloudinary.com/demo/second"));
+        assertEquals("gios-kebab/lunch/second", jdbc.queryForObject(
+                "SELECT image_public_id FROM lunch_menu_item WHERE id = ?", String.class, id));
+        verify(imageStorage).delete(ImageKind.LUNCH, "gios-kebab/lunch/first");
+
+        mvc.perform(delete("/api/admin/lunch-menu/items/" + id + "/image")
+                .session(session).with(csrf())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").doesNotExist());
+        assertEquals(null, jdbc.queryForObject(
+                "SELECT image_public_id FROM lunch_menu_item WHERE id = ?", String.class, id));
+        verify(imageStorage).delete(ImageKind.LUNCH, "gios-kebab/lunch/second");
+    }
+
+    @Test void standardLunchUpdateAndDeleteCleanUpManagedImages() throws Exception {
+        var session = owner();
+        long changed = create(session, lunch("MONDAY", "Changed", 0, true, true, null));
+        jdbc.update("UPDATE lunch_menu_item SET image_url = ?, image_public_id = ? WHERE id = ?",
+                "https://res.cloudinary.com/demo/image/upload/old.jpg", "gios-kebab/lunch/old", changed);
+        mvc.perform(put("/api/admin/lunch-menu/items/" + changed).session(session).with(csrf())
+                .contentType("application/json")
+                .content(lunch("MONDAY", "Changed", 0, true, true, "https://images.example.com/owner.jpg")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("https://images.example.com/owner.jpg"));
+        assertEquals(null, jdbc.queryForObject("SELECT image_public_id FROM lunch_menu_item WHERE id = ?", String.class, changed));
+        verify(imageStorage).delete(ImageKind.LUNCH, "gios-kebab/lunch/old");
+
+        long deleted = create(session, lunch("TUESDAY", "Deleted", 0, true, true, null));
+        jdbc.update("UPDATE lunch_menu_item SET image_url = ?, image_public_id = ? WHERE id = ?",
+                "https://res.cloudinary.com/demo/image/upload/deleted.jpg", "gios-kebab/lunch/deleted", deleted);
+        mvc.perform(delete("/api/admin/lunch-menu/items/" + deleted).session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(imageStorage).delete(ImageKind.LUNCH, "gios-kebab/lunch/deleted");
+    }
 
     @BeforeEach void reset() {
         items.deleteAll();

@@ -38,6 +38,8 @@ class MenuItem {
     @Size(max = 2048)
     @Column(length = 2048)
     private String imageUrl;
+    @Column(name = "image_public_id", length = 255)
+    private String imagePublicId;
     @Column(nullable = false)
     private int displayOrder;
     @Column(nullable = false, updatable = false)
@@ -62,6 +64,7 @@ class MenuItem {
             throw new IllegalArgumentException("Invalid menu item");
         }
         imageUrl = MenuItemImageUrls.normalize(imageUrl);
+        if (!java.util.Objects.equals(this.imageUrl, imageUrl)) this.imagePublicId = null;
         this.categoryId = categoryId;
         this.name = name;
         this.description = description;
@@ -93,6 +96,13 @@ class MenuItem {
     boolean isAvailable() { return available; }
     boolean isFeatured() { return featured; }
     String getImageUrl() { return imageUrl; }
+    String getImagePublicId() { return imagePublicId; }
+    String replaceManagedImage(String imageUrl, String publicId) {
+        String oldPublicId = imagePublicId;
+        this.imageUrl = MenuItemImageUrls.normalize(imageUrl);
+        this.imagePublicId = publicId;
+        return oldPublicId;
+    }
     int getDisplayOrder() { return displayOrder; }
     Instant getCreatedAt() { return createdAt; }
     Instant getUpdatedAt() { return updatedAt; }
