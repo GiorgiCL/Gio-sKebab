@@ -2,8 +2,11 @@ package com.kebabshop.backend.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -22,18 +25,34 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 
-import java.util.Locale;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/admin/auth")
-class AdminAuthController {
+public class AdminAuthController {
+    public static final String REMEMBER_UNTIL = "adminRememberUntil";
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository contexts;
+    private final Duration normalDuration;
+    private final Duration rememberDuration;
+    private final boolean secureCookie;
 
-    AdminAuthController(AuthenticationManager authenticationManager, SecurityContextRepository contexts) {
+    AdminAuthController(AuthenticationManager authenticationManager, SecurityContextRepository contexts,
+                        @Value("${server.servlet.session.timeout}") Duration normalDuration,
+                        @Value("${app.admin.remember-me-duration}") Duration rememberDuration,
+                        @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie) {
         this.authenticationManager = authenticationManager;
         this.contexts = contexts;
+        this.normalDuration = normalDuration;
+        if (rememberDuration.isNegative() || rememberDuration.isZero()
+                || rememberDuration.getNano() != 0 || rememberDuration.compareTo(Duration.ofDays(30)) > 0) {
+            throw new IllegalArgumentException("app.admin.remember-me-duration must be whole seconds between 1 second and 30 days");
+        }
+        this.rememberDuration = rememberDuration;
+        this.secureCookie = secureCookie;
     }
 
     @GetMapping("/csrf")
@@ -54,8 +73,19 @@ class AdminAuthController {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(
                         login.email().trim().toLowerCase(Locale.ROOT), login.password()));
-        request.getSession(true);
+        var session = request.getSession(true);
         request.changeSessionId();
+        if (Boolean.TRUE.equals(login.rememberMe())) {
+            session.setMaxInactiveInterval(Math.toIntExact(rememberDuration.getSeconds()));
+            session.setAttribute(REMEMBER_UNTIL, Instant.now().plus(rememberDuration));
+            String path = request.getContextPath().isEmpty() ? "/" : request.getContextPath();
+            response.setHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("JSESSIONID", session.getId())
+                    .httpOnly(true).secure(secureCookie).sameSite("Lax").path(path)
+                    .maxAge(rememberDuration).build().toString());
+        } else {
+            session.setMaxInactiveInterval(Math.toIntExact(normalDuration.getSeconds()));
+            session.removeAttribute(REMEMBER_UNTIL);
+        }
         var context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
@@ -89,7 +119,7 @@ class AdminAuthController {
 
     private static class InvalidLoginRequestException extends RuntimeException {}
 
-    record LoginRequest(String email, String password) {
+    record LoginRequest(String email, String password, Boolean rememberMe) {
         @Override
         public String toString() {
             return "LoginRequest[redacted]";

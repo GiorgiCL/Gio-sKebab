@@ -15,8 +15,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -87,6 +90,8 @@ class AdminAuthTests {
         MockHttpSession authenticated = (MockHttpSession) loggedIn.getRequest().getSession(false);
         assertTrue(authenticated != null);
         assertNotEquals(anonymousSessionId, authenticated.getId());
+        assertEquals(30 * 60, authenticated.getMaxInactiveInterval());
+        assertNull(authenticated.getAttribute(AdminAuthController.REMEMBER_UNTIL));
         mvc.perform(get("/api/admin/auth/me").session(authenticated))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("owner@example.com"));
@@ -97,6 +102,46 @@ class AdminAuthTests {
                 .andExpect(status().isNoContent());
         assertTrue(authenticated.isInvalid());
         mvc.perform(get("/api/admin/auth/me")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rememberedLoginUsesPersistentCookieAndServerSideAbsoluteExpiry() throws Exception {
+        provisioning.createFirstAccount("owner@example.com", "temporary-test-password");
+        var result = mvc.perform(post("/api/admin/auth/login").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\",\"rememberMe\":true}"))
+                .andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) result.getRequest().getSession(false);
+        assertTrue(session != null);
+        assertEquals(3 * 24 * 60 * 60, session.getMaxInactiveInterval());
+        assertTrue(session.getAttribute(AdminAuthController.REMEMBER_UNTIL) instanceof Instant);
+        String cookie = result.getResponse().getHeader("Set-Cookie");
+        assertTrue(cookie != null && cookie.contains("Max-Age=259200"));
+        assertTrue(cookie.contains("HttpOnly"));
+        assertTrue(cookie.contains("SameSite=Lax"));
+        mvc.perform(get("/api/admin/auth/me").session(session)).andExpect(status().isOk());
+        session.setAttribute(AdminAuthController.REMEMBER_UNTIL, Instant.now().minusSeconds(1));
+        mvc.perform(get("/api/admin/auth/me").session(session)).andExpect(status().isUnauthorized());
+        assertTrue(session.isInvalid());
+    }
+
+    @Test
+    void normalLoginAfterRememberedLoginRestoresShortSession() throws Exception {
+        provisioning.createFirstAccount("owner@example.com", "temporary-test-password");
+        var remembered = mvc.perform(post("/api/admin/auth/login").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\",\"rememberMe\":true}"))
+                .andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) remembered.getRequest().getSession(false);
+        assertTrue(session != null);
+        var normal = mvc.perform(post("/api/admin/auth/login").session(session).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\",\"rememberMe\":false}"))
+                .andExpect(status().isOk()).andReturn();
+        MockHttpSession shortSession = (MockHttpSession) normal.getRequest().getSession(false);
+        assertTrue(shortSession != null);
+        assertEquals(30 * 60, shortSession.getMaxInactiveInterval());
+        assertNull(shortSession.getAttribute(AdminAuthController.REMEMBER_UNTIL));
     }
 
     @Test
@@ -150,7 +195,7 @@ class AdminAuthTests {
 
     @Test
     void malformedAndOversizedCredentialsAreRejectedWithoutLeakage() throws Exception {
-        assertTrue(!new AdminAuthController.LoginRequest("owner@example.com", "secret-marker")
+        assertTrue(!new AdminAuthController.LoginRequest("owner@example.com", "secret-marker", false)
                 .toString().contains("secret-marker"));
         mvc.perform(post("/api/admin/auth/login").with(csrf()).contentType("application/json")
                         .content("{bad json"))

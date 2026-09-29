@@ -1,6 +1,7 @@
 package com.kebabshop.backend;
 
 import com.kebabshop.backend.auth.AdminAccountRepository;
+import com.kebabshop.backend.auth.AdminAuthController;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -38,8 +39,9 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.net.URI;
 import java.io.IOException;
+import java.net.URI;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 
@@ -97,6 +99,14 @@ class AdminSecurityConfiguration {
                     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                                     FilterChain chain) throws ServletException, IOException {
                         String path = request.getRequestURI().substring(request.getContextPath().length());
+                        var session = request.getSession(false);
+                        if (path.startsWith("/api/admin/") && !path.equals("/api/admin/auth/csrf")
+                                && !path.equals("/api/admin/auth/login") && session != null
+                                && session.getAttribute(AdminAuthController.REMEMBER_UNTIL) instanceof Instant until
+                                && !Instant.now().isBefore(until)) {
+                            session.invalidate();
+                            SecurityContextHolder.clearContext();
+                        }
                         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                         if (path.startsWith("/api/admin/") && !path.equals("/api/admin/auth/csrf")
                                 && !path.equals("/api/admin/auth/login") && !path.equals("/api/admin/auth/logout")

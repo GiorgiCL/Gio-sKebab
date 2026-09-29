@@ -95,9 +95,15 @@ class RestaurantHttpSemanticsTests {
             var login = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/admin/auth/login"))
                     .header("Content-Type", "application/json").header("X-CSRF-TOKEN", token)
                     .POST(HttpRequest.BodyPublishers.ofString(
-                            "{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\"}"))
+                            "{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\",\"rememberMe\":true}"))
                     .build();
-            assertEquals(200, client.send(login, HttpResponse.BodyHandlers.ofString()).statusCode());
+            var loggedIn = client.send(login, HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, loggedIn.statusCode());
+            assertEquals(1, loggedIn.headers().allValues("Set-Cookie").size());
+            String rememberedCookie = loggedIn.headers().firstValue("Set-Cookie").orElse("");
+            assertTrue(rememberedCookie.contains("Max-Age=259200"));
+            assertTrue(rememberedCookie.contains("HttpOnly"));
+            assertTrue(rememberedCookie.contains("SameSite=Lax"));
             assertEquals(200, get(client, "/api/admin/auth/me").statusCode());
             var logout = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/admin/auth/logout"))
                     .header("X-CSRF-TOKEN", token).POST(HttpRequest.BodyPublishers.noBody()).build();
