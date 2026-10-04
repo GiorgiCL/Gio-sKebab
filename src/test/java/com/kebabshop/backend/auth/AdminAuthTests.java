@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -163,6 +164,37 @@ class AdminAuthTests {
                         .contentType("application/json")
                         .content("{\"email\":\"owner@example.com\",\"password\":\"temporary-test-password\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void failedLoginAttemptsFromOneSourceAreThrottledAcrossSubmittedEmails() throws Exception {
+        provisioning.createFirstAccount("owner@example.com", "temporary-test-password");
+        String finalSource = "203.0.113.74";
+        String firstFailure = null;
+        String secondFailure = null;
+
+        for (int attempt = 0; attempt < LoginAttemptLimiter.MAX_FAILED_ATTEMPTS; attempt++) {
+            String email = attempt % 2 == 0 ? "owner@example.com" : "unknown@example.com";
+            var result = mvc.perform(post("/api/admin/auth/login").with(csrf())
+                            .header("X-Forwarded-For", "198.51.100." + (attempt + 1) + ", " + finalSource)
+                            .contentType("application/json")
+                            .content("{\"email\":\"" + email + "\",\"password\":\"wrong-password\"}"))
+                    .andExpect(status().isUnauthorized()).andReturn();
+            if (attempt == 0) {
+                firstFailure = result.getResponse().getContentAsString();
+            } else if (attempt == 1) {
+                secondFailure = result.getResponse().getContentAsString();
+            }
+        }
+
+        assertEquals(firstFailure, secondFailure);
+        mvc.perform(post("/api/admin/auth/login").with(csrf())
+                        .header("X-Forwarded-For", "192.0.2.201, " + finalSource)
+                        .contentType("application/json")
+                        .content("{\"email\":\"owner@example.com\",\"password\":\"wrong-password\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.detail").value("Too many login attempts. Try again later."));
     }
 
     @Test

@@ -8,9 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,16 +37,19 @@ import java.util.Locale;
 public class AdminAuthController {
     public static final String REMEMBER_UNTIL = "adminRememberUntil";
     private final AuthenticationManager authenticationManager;
+    private final LoginAttemptLimiter loginAttemptLimiter;
     private final SecurityContextRepository contexts;
     private final Duration normalDuration;
     private final Duration rememberDuration;
     private final boolean secureCookie;
 
-    AdminAuthController(AuthenticationManager authenticationManager, SecurityContextRepository contexts,
+    AdminAuthController(AuthenticationManager authenticationManager, LoginAttemptLimiter loginAttemptLimiter,
+                        SecurityContextRepository contexts,
                         @Value("${server.servlet.session.timeout}") Duration normalDuration,
                         @Value("${app.admin.remember-me-duration}") Duration rememberDuration,
                         @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookie) {
         this.authenticationManager = authenticationManager;
+        this.loginAttemptLimiter = loginAttemptLimiter;
         this.contexts = contexts;
         this.normalDuration = normalDuration;
         if (rememberDuration.isNegative() || rememberDuration.isZero()
@@ -70,9 +75,28 @@ public class AdminAuthController {
                 || login.password().getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new InvalidLoginRequestException();
         }
-        Authentication authentication = authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(
-                        login.email().trim().toLowerCase(Locale.ROOT), login.password()));
+        LoginAttemptLimiter.Decision decision = loginAttemptLimiter.begin(request);
+        if (!decision.isAllowed()) {
+            throw new LoginRateLimitedException(decision.retryAfter());
+        }
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(
+                            login.email().trim().toLowerCase(Locale.ROOT), login.password()));
+        } catch (AuthenticationServiceException exception) {
+            loginAttemptLimiter.aborted(decision.attempt());
+            throw exception;
+        } catch (AuthenticationException exception) {
+            loginAttemptLimiter.failed(decision.attempt());
+            throw exception;
+        } catch (RuntimeException | Error exception) {
+            loginAttemptLimiter.aborted(decision.attempt());
+            throw exception;
+        }
+        loginAttemptLimiter.succeeded(decision.attempt());
+
         var session = request.getSession(true);
         request.changeSessionId();
         if (Boolean.TRUE.equals(login.rememberMe())) {
@@ -104,6 +128,16 @@ public class AdminAuthController {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
     }
 
+    @ExceptionHandler(LoginRateLimitedException.class)
+    ResponseEntity<ProblemDetail> loginRateLimited(LoginRateLimitedException exception) {
+        long retryAfterSeconds = Math.max(1, (exception.retryAfter().toMillis() + 999) / 1000);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "Too many login attempts. Try again later.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
+                .body(problem);
+    }
+
     @ExceptionHandler({InvalidLoginRequestException.class, HttpMessageNotReadableException.class})
     ResponseEntity<ProblemDetail> invalidRequest() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid login request");
@@ -118,6 +152,17 @@ public class AdminAuthController {
     }
 
     private static class InvalidLoginRequestException extends RuntimeException {}
+    private static class LoginRateLimitedException extends RuntimeException {
+        private final Duration retryAfter;
+
+        LoginRateLimitedException(Duration retryAfter) {
+            this.retryAfter = retryAfter;
+        }
+
+        Duration retryAfter() {
+            return retryAfter;
+        }
+    }
 
     record LoginRequest(String email, String password, Boolean rememberMe) {
         @Override
