@@ -12,8 +12,8 @@ public final class MenuItemImageUrls {
         try {
             URI uri = URI.create(normalized);
             String scheme = uri.getScheme();
-            if (uri.getHost() == null || uri.getUserInfo() != null
-                    || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+            if (uri.getHost() == null || uri.getUserInfo() != null || uri.getPort() > 65535
+                    || !"https".equalsIgnoreCase(scheme)) {
                 throw new IllegalArgumentException("Invalid menu item image URL");
             }
         } catch (IllegalArgumentException exception) {

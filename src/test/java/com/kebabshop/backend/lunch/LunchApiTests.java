@@ -49,6 +49,15 @@ class LunchApiTests {
     @Autowired JdbcTemplate jdbc;
     @MockitoBean ManagedImageStorage imageStorage;
 
+    @Test
+    void rejectsInsecureManualImageUrl() throws Exception {
+        mvc.perform(post("/api/admin/lunch-menu/items").session(owner()).with(csrf())
+                .contentType("application/json")
+                .content(lunch("MONDAY", "Food", 0, true, true, "http://images.example.com/image.jpg")))
+                .andExpect(status().isBadRequest());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM lunch_menu_item", Integer.class));
+    }
+
     @Test void lunchUploadReplaceAndRemovalKeepDatabaseAndStorageInSync() throws Exception {
         var session = owner();
         long id = create(session, lunch("MONDAY", "Lunch", 0, true, true, "https://images.example.com/owner.jpg"));

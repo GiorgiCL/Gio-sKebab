@@ -36,7 +36,7 @@ Provide authenticated, low-friction tools for managing restaurant details and li
 - The schema is established in migrations V1–V5 for admin account, restaurant profile, opening hours, menu, and promotions. Keep the ER/model documentation aligned with these migrations; add media metadata only if uploads are later selected.
 - Use migrations from the first schema change. Apply database constraints as well as application validation. Decide archive/hide/delete semantics so accidental deletion does not erase useful administrative history; do not imply audit/history guarantees until designed.
 - Represent prices in a currency-safe form with an explicit currency decision, and represent weekly and exceptional opening intervals in a way that can express closed days and overnight hours if needed. Define the timezone source for open/closed calculations; avoid embedding country-specific behavior in generic domain rules.
-- The current menu image contract is a nullable external HTTP/HTTPS URL reference. If owner-managed uploads are later selected, store bytes outside PostgreSQL and add only the validation, metadata, lifecycle, and delivery support that workflow needs.
+- The current menu image contract is a nullable external HTTPS URL reference. If owner-managed uploads are later selected, store bytes outside PostgreSQL and add only the validation, metadata, lifecycle, and delivery support that workflow needs.
 - Prefer a modular monolith and existing dependencies. Do not introduce microservices, Kafka, Kubernetes, Redis, or enterprise IAM without measured need.
 
 ## Phased implementation plan
@@ -75,7 +75,7 @@ Model recurring weekly hours and date-specific exceptions, including explicit cl
 
 ### F. Menu categories and items
 
-Design categories and menu items, including name, description, price/currency, category, optional HTTP/HTTPS image URL, available/sold-out state, featured state, display order, and timestamps. Decide soft-hide/archive and deletion semantics, referential integrity, and how category ordering behaves. Categories and items must be data-managed, never hardcoded into application logic. Dietary metadata is excluded from V1.
+Design categories and menu items, including name, description, price/currency, category, optional HTTPS image URL, available/sold-out state, featured state, display order, and timestamps. Decide soft-hide/archive and deletion semantics, referential integrity, and how category ordering behaves. Categories and items must be data-managed, never hardcoded into application logic. Dietary metadata is excluded from V1.
 
 **Exit:** schema and service rules support safe management and stable public ordering. **Status: implemented in backend slices; image URLs are references only, with no upload/storage workflow.**
 
@@ -87,7 +87,7 @@ The core owner authentication, password hashing, protected admin routes, session
 
 ### H. Optional image upload and media storage
 
-Only implement this phase if owner-managed uploads are a confirmed product need. The current V1 menu contract stores an optional HTTP/HTTPS image URL and does not upload or store files. If uploads are later required, define a storage adapter independent of a final cloud vendor, validate size and actual content, use safe object keys, implement replacement/removal and metadata persistence, provide optimized public retrieval and orphan cleanup, and document storage configuration and retention. Prevent uploaded content from being served as executable content.
+Only implement this phase if owner-managed uploads are a confirmed product need. The current V1 menu contract stores an optional HTTPS image URL and does not upload or store files. If uploads are later required, define a storage adapter independent of a final cloud vendor, validate size and actual content, use safe object keys, implement replacement/removal and metadata persistence, provide optimized public retrieval and orphan cleanup, and document storage configuration and retention. Prevent uploaded content from being served as executable content.
 
 **Exit:** if selected, the owner can upload, replace, and remove menu imagery safely without storing large blobs in PostgreSQL. **Status: deferred; not required for the current URL-reference contract.**
 

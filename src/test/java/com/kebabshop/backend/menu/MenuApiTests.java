@@ -300,6 +300,11 @@ class MenuApiTests {
                         .content(item(visible, "Bad image", "8.50", true, true, false,
                                 "https://images.example.com/" + "x".repeat(2050), 0)))
                 .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/admin/menu/items/" + itemId).session(session).with(csrf())
+                        .contentType("application/json")
+                        .content(item(visible, "Bad image", "8.50", true, true, false,
+                                "http://images.example.com/image.jpg", 0)))
+                .andExpect(status().isBadRequest());
         mvc.perform(get("/api/admin/menu/items/" + itemId).session(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.featured").value(true))
                 .andExpect(jsonPath("$.imageUrl").doesNotExist());
