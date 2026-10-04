@@ -36,7 +36,6 @@ public class RequestFailureLoggingFilter extends OncePerRequestFilter {
                     String method = METHODS.contains(request.getMethod()) ? request.getMethod() : "OTHER";
                     int failureStatus = status >= 500 ? status : 500;
                     log.error("Backend request failed method={} route={} status={} exception={}", method, route, failureStatus, exceptionClass);
-                    SafeFailureLogs.requestFailure(method, route, failureStatus, exceptionClass);
                 }
             }
         }

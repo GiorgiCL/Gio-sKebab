@@ -56,10 +56,6 @@
             <version>2.4.0</version>
         </dependency>
         <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-api</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
@@ -129,7 +125,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <environmentVariables>
-                        <POSTHOG_LOGS_ENABLED>false</POSTHOG_LOGS_ENABLED>
                         <OTEL_SDK_DISABLED>true</OTEL_SDK_DISABLED>
                     </environmentVariables>
                 </configuration>
@@ -139,7 +134,6 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <environmentVariables>
-                        <POSTHOG_LOGS_ENABLED>false</POSTHOG_LOGS_ENABLED>
                         <OTEL_SDK_DISABLED>true</OTEL_SDK_DISABLED>
                     </environmentVariables>
                 </configuration>

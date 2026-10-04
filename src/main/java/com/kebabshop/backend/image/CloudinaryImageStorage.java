@@ -6,7 +6,6 @@ import com.cloudinary.api.exceptions.ApiException;
 import com.cloudinary.api.exceptions.BadRequest;
 import com.cloudinary.api.exceptions.NotAllowed;
 import com.cloudinary.api.exceptions.RateLimited;
-import com.kebabshop.backend.observability.SafeFailureLogs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
@@ -99,7 +98,6 @@ class CloudinaryImageStorage implements ManagedImageStorage {
         String exceptionClass = exception.getClass().getSimpleName();
         log.warn("Cloudinary image operation={} kind={} failure={} exception={}",
                 operation, imageKind, category, exceptionClass);
-        SafeFailureLogs.storageFailure(operation, imageKind, category, exceptionClass);
     }
 
     static String classifyFailure(Exception exception) {
