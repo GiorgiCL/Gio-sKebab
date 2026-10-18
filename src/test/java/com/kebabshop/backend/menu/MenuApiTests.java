@@ -50,6 +50,24 @@ class MenuApiTests {
     @MockitoBean ManagedImageStorage imageStorage;
 
     @Test
+    void boundedNumericStringsUseApplicationPriceBinding() throws Exception {
+        var session = ownerSession();
+        long categoryId = createCategory(session, "Food", 0, true);
+        long itemId = createItem(session, categoryId, "Quoted price", "\"8.50\"", true, true, 0);
+        mvc.perform(get("/api/admin/menu/items/" + itemId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priceEur").value(8.50));
+
+        for (String price : new String[] {"\"1.2.3\"", "\"" + "1".repeat(64) + "x\""}) {
+            mvc.perform(post("/api/admin/menu/items").session(session).with(csrf())
+                            .contentType("application/json")
+                            .content(item(categoryId, "Invalid price", price, true, true, 1)))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(1L, items.count());
+    }
+
+    @Test
     void standardUpdateAndDeleteCleanUpOnlyManagedImages() throws Exception {
         var session = ownerSession();
         long categoryId = createCategory(session, "Food", 0, true);
