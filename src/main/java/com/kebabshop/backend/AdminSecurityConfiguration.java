@@ -34,6 +34,7 @@ import org.springframework.security.web.authentication.logout.CookieClearingLogo
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -79,6 +80,11 @@ class AdminSecurityConfiguration {
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository contexts,
                                             @Qualifier("corsConfigurationSource") CorsConfigurationSource cors,
                                             AdminAccountRepository accounts) throws Exception {
+        var paths = PathPatternRequestMatcher.withDefaults();
+        var adminRequests = paths.matcher("/api/admin/**");
+        var csrfRequests = paths.matcher(HttpMethod.GET, "/api/admin/auth/csrf");
+        var loginRequests = paths.matcher(HttpMethod.POST, "/api/admin/auth/login");
+        var logoutRequests = paths.matcher(HttpMethod.POST, "/api/admin/auth/logout");
         return http
                 .cors(config -> config.configurationSource(cors))
                 .securityContext(config -> config.securityContextRepository(contexts))
@@ -86,9 +92,9 @@ class AdminSecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/public/restaurant",
                                 "/api/public/opening-hours", "/api/public/opening-status",
                                 "/api/public/menu", "/api/public/lunch-menu", "/api/public/promotions").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/admin/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/admin/auth/login").permitAll()
-                        .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers(csrfRequests).permitAll()
+                        .requestMatchers(loginRequests).permitAll()
+                        .requestMatchers(adminRequests).authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> apiError(response, HttpStatus.UNAUTHORIZED))
@@ -98,18 +104,18 @@ class AdminSecurityConfiguration {
                     @Override
                     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                                     FilterChain chain) throws ServletException, IOException {
-                        String path = request.getRequestURI().substring(request.getContextPath().length());
+                        // Share authorization's parsed-path semantics, including encoded segments.
+                        boolean protectedAdminRequest = adminRequests.matches(request)
+                                && !csrfRequests.matches(request) && !loginRequests.matches(request);
                         var session = request.getSession(false);
-                        if (path.startsWith("/api/admin/") && !path.equals("/api/admin/auth/csrf")
-                                && !path.equals("/api/admin/auth/login") && session != null
+                        if (protectedAdminRequest && session != null
                                 && session.getAttribute(AdminAuthController.REMEMBER_UNTIL) instanceof Instant until
                                 && !Instant.now().isBefore(until)) {
                             session.invalidate();
                             SecurityContextHolder.clearContext();
                         }
                         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                        if (path.startsWith("/api/admin/") && !path.equals("/api/admin/auth/csrf")
-                                && !path.equals("/api/admin/auth/login") && !path.equals("/api/admin/auth/logout")
+                        if (protectedAdminRequest && !logoutRequests.matches(request)
                                 && authentication != null && authentication.isAuthenticated()
                                 && !(authentication instanceof AnonymousAuthenticationToken)
                                 && accounts.findByEmail(authentication.getName())
