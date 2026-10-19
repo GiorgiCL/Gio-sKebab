@@ -2,6 +2,9 @@ package com.kebabshop.backend.lunch;
 
 import com.kebabshop.backend.menu.MenuItemImageUrls;
 import jakarta.persistence.*;
+import com.kebabshop.backend.allergen.*;
+import java.util.Set;
+import java.util.HashSet;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -33,6 +36,26 @@ class LunchMenuItem {
     private Instant createdAt;
     @Column(nullable = false)
     private Instant updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allergen_status", nullable = false, length = 32)
+    private AllergenStatus allergenStatus = AllergenStatus.NOT_VERIFIED;
+    @ElementCollection
+    @CollectionTable(name = "lunch_menu_item_allergen", joinColumns = @JoinColumn(name = "item_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allergen", nullable = false, length = 40)
+    private Set<Allergen> allergens = new HashSet<>();
+
+    public AllergenInfo getAllergenInfo() { return new AllergenInfo(allergenStatus, allergens); }
+
+    void replaceAllergenInfo(AllergenInfo info) {
+        // Older clients may omit this field; preserve existing verification on unrelated edits.
+        if (info == null) return;
+        if (allergenStatus != info.status() || !allergens.equals(info.allergens())) updatedAt = Instant.now();
+        allergenStatus = info.status();
+        allergens.clear();
+        allergens.addAll(info.allergens());
+    }
 
     protected LunchMenuItem() {}
 

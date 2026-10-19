@@ -2,6 +2,7 @@ package com.kebabshop.backend.lunch;
 
 import com.kebabshop.backend.ContentTranslations;
 import jakarta.validation.constraints.*;
+import com.kebabshop.backend.allergen.AllergenInfo;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -18,7 +19,7 @@ record LunchRequest(@NotNull DayOfWeek dayOfWeek,
                     @NotNull Boolean active, @NotNull Boolean available,
                     @NotNull @Min(0) Integer displayOrder,
                     @Size(max = 2048) String imageUrl,
-                    Map<String, LunchTranslation> translations) {
+                    Map<String, LunchTranslation> translations, AllergenInfo allergenInfo) {
     LunchRequest {
         if (description != null && description.isBlank()) description = null;
     }
@@ -26,7 +27,7 @@ record LunchRequest(@NotNull DayOfWeek dayOfWeek,
 
 record LunchResponse(Long id, DayOfWeek dayOfWeek, String name, String description, BigDecimal priceEur,
                      boolean active, boolean available, int displayOrder, String imageUrl,
-                     Instant createdAt, Instant updatedAt, Map<String, LunchTranslation> translations) {
+                     Instant createdAt, Instant updatedAt, Map<String, LunchTranslation> translations, AllergenInfo allergenInfo) {
     static LunchResponse from(LunchMenuItem item, Map<String, ContentTranslations.Text> translations) {
         var localized = ContentTranslations.withCanonical(
                 new ContentTranslations.Text(item.getName(), item.getDescription()), translations);
@@ -34,15 +35,15 @@ record LunchResponse(Long id, DayOfWeek dayOfWeek, String name, String descripti
                 item.getPriceEur(), item.isActive(), item.isAvailable(), item.getDisplayOrder(), item.getImageUrl(),
                 item.getCreatedAt(), item.getUpdatedAt(), localized.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey,
-                        entry -> new LunchTranslation(entry.getValue().first(), entry.getValue().description()))));
+                        entry -> new LunchTranslation(entry.getValue().first(), entry.getValue().description()))), item.getAllergenInfo());
     }
 }
 
 record PublicLunchItem(Long id, String name, String description, BigDecimal priceEur,
-                       boolean available, String imageUrl) {
+                       boolean available, String imageUrl, AllergenInfo allergenInfo) {
     static PublicLunchItem from(LunchMenuItem item, ContentTranslations.Text text) {
         return new PublicLunchItem(item.getId(), text.first(), text.description(), item.getPriceEur(),
-                item.isAvailable(), item.getImageUrl());
+                item.isAvailable(), item.getImageUrl(), item.getAllergenInfo());
     }
 }
 

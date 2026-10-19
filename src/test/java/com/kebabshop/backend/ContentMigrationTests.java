@@ -72,7 +72,7 @@ class ContentMigrationTests {
         jdbc.update("INSERT INTO restaurant_profile_translation (profile_id, locale, display_name) VALUES (1, 'en', 'Gio''s Kebab EN')");
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
 
-        assertEquals("13", Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load()
+        assertEquals("14", Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load()
                 .info().current().getVersion().toString());
         assertEquals("Kebabs and grilled dishes on Savanorių Avenue, with house-made sauces and Georgian flavours.",
                 jdbc.queryForObject("SELECT description FROM restaurant_profile_translation WHERE locale = 'en'", String.class));

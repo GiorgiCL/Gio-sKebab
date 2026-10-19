@@ -75,6 +75,7 @@ class LunchService {
     LunchResponse create(LunchRequest request) {
         var item = new LunchMenuItem(request.dayOfWeek(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.displayOrder(), request.imageUrl());
+        item.replaceAllergenInfo(request.allergenInfo());
         entityManager.persist(item);
         entityManager.flush();
         translations.replace(Kind.LUNCH_ITEM, item.getId(), texts(request.translations()),
@@ -90,6 +91,7 @@ class LunchService {
         String oldPublicId = item.getImagePublicId();
         item.replace(request.dayOfWeek(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.displayOrder(), request.imageUrl());
+        item.replaceAllergenInfo(request.allergenInfo());
         entityManager.flush();
         translations.replace(Kind.LUNCH_ITEM, id, texts(request.translations()),
                 new Text(item.getName(), item.getDescription()));

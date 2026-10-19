@@ -133,6 +133,7 @@ class MenuService {
         requireCategory(request.categoryId());
         var item = new MenuItem(request.categoryId(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.featured(), request.imageUrl(), request.displayOrder());
+        item.replaceAllergenInfo(request.allergenInfo());
         entityManager.persist(item);
         entityManager.flush();
         translations.replace(Kind.ITEM, item.getId(), itemTexts(request.translations()), new Text(item.getName(), item.getDescription()));
@@ -148,6 +149,7 @@ class MenuService {
         String oldPublicId = item.getImagePublicId();
         item.replace(request.categoryId(), request.name(), request.description(), request.priceEur(),
                 request.active(), request.available(), request.featured(), request.imageUrl(), request.displayOrder());
+        item.replaceAllergenInfo(request.allergenInfo());
         entityManager.flush();
         translations.replace(Kind.ITEM, id, itemTexts(request.translations()), new Text(item.getName(), item.getDescription()));
         entityManager.refresh(item);

@@ -33,6 +33,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Import(PostgresqlSchemaIT.ContainerConfiguration.class)
 class PostgresqlSchemaIT {
     @Test
+    void existingPostgresqlItemsUpgradeToUnverifiedAllergens() {
+        com.kebabshop.backend.allergen.AllergenMigrationTests.verifyUpgrade(dataSource, "allergen_upgrade");
+    }
+
+    @Test
     void existingPostgresqlRowsSurviveV7ToV8() {
         String schema = "lunch_upgrade";
         Flyway.configure().dataSource(dataSource).schemas(schema).locations("classpath:db/migration")
@@ -64,7 +69,7 @@ class PostgresqlSchemaIT {
         var upgraded = Flyway.configure().dataSource(dataSource).schemas(schema).locations("classpath:db/migration").load();
         upgraded.migrate();
 
-        assertEquals("13", upgraded.info().current().getVersion().toString());
+        assertEquals("14", upgraded.info().current().getVersion().toString());
         assertEquals(283277535, jdbc.queryForObject("SELECT checksum FROM " + schema + ".flyway_schema_history WHERE version = '10'", Integer.class));
         assertEquals("Kebabs and grilled dishes on Savanori\u0173 Avenue, with house-made sauces and Georgian flavours.",
                 jdbc.queryForObject("SELECT description FROM " + schema + ".restaurant_profile_translation WHERE locale = 'en'", String.class));
@@ -102,8 +107,8 @@ class PostgresqlSchemaIT {
             assertEquals(17, connection.getMetaData().getDatabaseMajorVersion());
         }
         assertNotNull(entityManagerFactory); // Context startup has already run Hibernate schema validation.
-        assertEquals("13", flyway.info().current().getVersion().toString());
-        assertEquals(13, flyway.info().applied().length);
+        assertEquals("14", flyway.info().current().getVersion().toString());
+        assertEquals(14, flyway.info().applied().length);
         for (String table : new String[]{"menu_item", "lunch_menu_item"}) {
             assertEquals("YES", jdbc.queryForObject(
                     "SELECT is_nullable FROM information_schema.columns "
@@ -299,7 +304,7 @@ class PostgresqlSchemaIT {
                 .locations("classpath:db/migration").load();
         upgraded.migrate();
 
-        assertEquals("13", upgraded.info().current().getVersion().toString());
+        assertEquals("14", upgraded.info().current().getVersion().toString());
         assertEquals(283277535, jdbc.queryForObject("SELECT checksum FROM " + schema + ".flyway_schema_history WHERE version = '10'", Integer.class));
         assertEquals("Original description", jdbc.queryForObject(
                 "SELECT description FROM localization_upgrade.restaurant_profile WHERE id = 1", String.class));

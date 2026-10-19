@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import com.kebabshop.backend.allergen.AllergenInfo;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -27,7 +28,7 @@ record ItemRequest(@NotNull @Min(1) Long categoryId,
                    @NotNull Boolean active, @NotNull Boolean available,
                    @NotNull Boolean featured, @Size(max = 2048) String imageUrl,
                    @NotNull @Min(0) Integer displayOrder,
-                   Map<String, ItemTranslation> translations) {
+                   Map<String, ItemTranslation> translations, AllergenInfo allergenInfo) {
     ItemRequest {
         if (description != null && description.isBlank()) description = null;
     }
@@ -46,23 +47,23 @@ record CategoryResponse(Long id, String name, int displayOrder, boolean active,
 
 record ItemResponse(Long id, Long categoryId, String name, String description, BigDecimal priceEur,
                     boolean active, boolean available, boolean featured, String imageUrl,
-                    int displayOrder, Instant createdAt, Instant updatedAt, Map<String, ItemTranslation> translations) {
+                    int displayOrder, Instant createdAt, Instant updatedAt, Map<String, ItemTranslation> translations, AllergenInfo allergenInfo) {
     static ItemResponse from(MenuItem item, Map<String, ContentTranslations.Text> translations) {
         return new ItemResponse(item.getId(), item.getCategoryId(), item.getName(), item.getDescription(),
                 item.getPriceEur(), item.isActive(), item.isAvailable(), item.isFeatured(), item.getImageUrl(), item.getDisplayOrder(),
                 item.getCreatedAt(), item.getUpdatedAt(),
                 ContentTranslations.withCanonical(new ContentTranslations.Text(item.getName(), item.getDescription()), translations)
                         .entrySet().stream().collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,
-                                entry -> new ItemTranslation(entry.getValue().first(), entry.getValue().description()))));
+                                entry -> new ItemTranslation(entry.getValue().first(), entry.getValue().description()))), item.getAllergenInfo());
     }
 }
 
 record PublicMenuResponse(List<PublicCategory> categories) {}
 record PublicCategory(Long id, String name, List<PublicItem> items) {}
 record PublicItem(Long id, String name, String description, BigDecimal priceEur,
-                  boolean available, boolean featured, String imageUrl) {
+                  boolean available, boolean featured, String imageUrl, AllergenInfo allergenInfo) {
     static PublicItem from(MenuItem item, ContentTranslations.Text text) {
         return new PublicItem(item.getId(), text.first(), text.description(),
-                item.getPriceEur(), item.isAvailable(), item.isFeatured(), item.getImageUrl());
+                item.getPriceEur(), item.isAvailable(), item.isFeatured(), item.getImageUrl(), item.getAllergenInfo());
     }
 }

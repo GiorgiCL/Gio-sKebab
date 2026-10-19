@@ -11,6 +11,14 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import com.kebabshop.backend.allergen.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import java.util.Set;
+import java.util.HashSet;
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -46,6 +54,26 @@ class MenuItem {
     private Instant createdAt;
     @Column(nullable = false)
     private Instant updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allergen_status", nullable = false, length = 32)
+    private AllergenStatus allergenStatus = AllergenStatus.NOT_VERIFIED;
+    @ElementCollection
+    @CollectionTable(name = "menu_item_allergen", joinColumns = @JoinColumn(name = "item_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allergen", nullable = false, length = 40)
+    private Set<Allergen> allergens = new HashSet<>();
+
+    public AllergenInfo getAllergenInfo() { return new AllergenInfo(allergenStatus, allergens); }
+
+    void replaceAllergenInfo(AllergenInfo info) {
+        // Older clients may omit this field; preserve existing verification on unrelated edits.
+        if (info == null) return;
+        if (allergenStatus != info.status() || !allergens.equals(info.allergens())) updatedAt = Instant.now();
+        allergenStatus = info.status();
+        allergens.clear();
+        allergens.addAll(info.allergens());
+    }
 
     protected MenuItem() {}
 
