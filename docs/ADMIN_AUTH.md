@@ -10,12 +10,13 @@ An operator provisions the account exactly once using the application in non-web
 
 | Request | Behavior |
 | --- | --- |
+| `GET /api/admin/auth/session-options` | Anonymous allowed. Returns `{ "rememberMeSeconds": 259200 }` with the actual configured remembered-login duration (example is the three-day default). `Cache-Control: no-store`; does not create a session or issue a cookie/CSRF token. Used to explain the optional login choice before submission. |
 | `GET /api/admin/auth/csrf` | Anonymous allowed. Returns `headerName` and `token`, initializing a session token. Send the returned header with state-changing requests and the same session cookie. |
 | `POST /api/admin/auth/login` | JSON `email`, `password`, and optional `rememberMe` boolean (defaults to false), CSRF required. Returns 200 with `{ "email": "..." }` and an authenticated session; wrong passwords, unknown accounts, and disabled accounts return the same 401 message. |
 | `GET /api/admin/auth/me` | Requires the authenticated session; returns the account email, otherwise 401. |
 | `POST /api/admin/auth/logout` | CSRF required. Invalidates the session, clears its cookie, and returns 204. |
 
-Only the documented public restaurant, menu, and promotions GET routes plus anonymous CSRF/login are publicly permitted. Other `/api/admin/**` requests require authentication; other routes remain denied by default. Owner content routes are documented in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md), [MENU_SLICE.md](MENU_SLICE.md), and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Malformed, blank, or oversized login fields return a generic 400 problem response without echoing credentials. Passwords are limited to 72 UTF-8 bytes so BCrypt never silently truncates them. Spring Security's standard headers remain enabled. No password, hash, or session ID is returned by the API.
+Only the documented public restaurant, menu, and promotions GET routes plus anonymous session-options/CSRF/login are publicly permitted. Other `/api/admin/**` requests require authentication; other routes remain denied by default. Owner content routes are documented in [RESTAURANT_SLICE.md](RESTAURANT_SLICE.md), [MENU_SLICE.md](MENU_SLICE.md), and [PROMOTIONS_SLICE.md](PROMOTIONS_SLICE.md). Malformed, blank, or oversized login fields return a generic 400 problem response without echoing credentials. Passwords are limited to 72 UTF-8 bytes so BCrypt never silently truncates them. Spring Security's standard headers remain enabled. No password, hash, or session ID is returned by the API.
 
 ## Browser and deployment model
 

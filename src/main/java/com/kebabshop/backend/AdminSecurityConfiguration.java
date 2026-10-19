@@ -83,6 +83,7 @@ class AdminSecurityConfiguration {
         var paths = PathPatternRequestMatcher.withDefaults();
         var adminRequests = paths.matcher("/api/admin/**");
         var csrfRequests = paths.matcher(HttpMethod.GET, "/api/admin/auth/csrf");
+        var sessionOptionsRequests = paths.matcher(HttpMethod.GET, "/api/admin/auth/session-options");
         var loginRequests = paths.matcher(HttpMethod.POST, "/api/admin/auth/login");
         var logoutRequests = paths.matcher(HttpMethod.POST, "/api/admin/auth/logout");
         return http
@@ -93,6 +94,7 @@ class AdminSecurityConfiguration {
                                 "/api/public/opening-hours", "/api/public/opening-status",
                                 "/api/public/menu", "/api/public/lunch-menu", "/api/public/promotions").permitAll()
                         .requestMatchers(csrfRequests).permitAll()
+                        .requestMatchers(sessionOptionsRequests).permitAll()
                         .requestMatchers(loginRequests).permitAll()
                         .requestMatchers(adminRequests).authenticated()
                         .anyRequest().denyAll())
@@ -106,7 +108,8 @@ class AdminSecurityConfiguration {
                                                     FilterChain chain) throws ServletException, IOException {
                         // Share authorization's parsed-path semantics, including encoded segments.
                         boolean protectedAdminRequest = adminRequests.matches(request)
-                                && !csrfRequests.matches(request) && !loginRequests.matches(request);
+                                && !csrfRequests.matches(request) && !sessionOptionsRequests.matches(request)
+                                && !loginRequests.matches(request);
                         var session = request.getSession(false);
                         if (protectedAdminRequest && session != null
                                 && session.getAttribute(AdminAuthController.REMEMBER_UNTIL) instanceof Instant until

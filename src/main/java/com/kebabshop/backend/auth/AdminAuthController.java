@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseCookie;
@@ -64,6 +65,13 @@ public class AdminAuthController {
     CsrfResponse csrf(HttpServletRequest request) {
         CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         return new CsrfResponse(token.getHeaderName(), token.getToken());
+    }
+
+    @GetMapping("/session-options")
+    ResponseEntity<SessionOptionsResponse> sessionOptions() {
+        // Let the optional login control explain the real configuration without creating a session.
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new SessionOptionsResponse(rememberDuration.getSeconds()));
     }
 
     @PostMapping("/login")
@@ -172,4 +180,5 @@ public class AdminAuthController {
     }
     record AdminResponse(String email) {}
     record CsrfResponse(String headerName, String token) {}
+    record SessionOptionsResponse(long rememberMeSeconds) {}
 }

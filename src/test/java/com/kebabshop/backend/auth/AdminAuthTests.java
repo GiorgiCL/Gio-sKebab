@@ -47,6 +47,17 @@ class AdminAuthTests {
     }
 
     @Test
+    void loginOptionsExposeConfiguredDurationWithoutCreatingASession() throws Exception {
+        var result = mvc.perform(get("/api/admin/auth/session-options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rememberMeSeconds").value(259200))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().doesNotExist("Set-Cookie")).andReturn();
+        assertNull(result.getRequest().getSession(false));
+        mvc.perform(post("/api/admin/auth/session-options")).andExpect(status().isForbidden());
+    }
+
+    @Test
     void provisioningEncodesNormalizesAndRefusesReinitialization() {
         assertThrows(IllegalStateException.class,
                 () -> new AdminBootstrapConfiguration().firstAdminBootstrap(provisioning, new MockEnvironment()));
