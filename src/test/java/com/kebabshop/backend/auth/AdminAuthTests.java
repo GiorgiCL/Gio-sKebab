@@ -58,6 +58,18 @@ class AdminAuthTests {
     }
 
     @Test
+    void blankProvisioningPasswordsAreRejectedWithoutConsumingTheOwnerAccount() {
+        for (String password : new String[]{" ".repeat(12), "\t\n".repeat(6), "\u3000".repeat(12)}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> provisioning.createFirstAccount("owner@example.com", password));
+            assertEquals(0, accounts.count());
+        }
+        provisioning.createFirstAccount("owner@example.com", "temporary-test-password");
+        assertTrue(encoder.matches("temporary-test-password",
+                accounts.findById((short) 1).orElseThrow().getPasswordHash()));
+    }
+
+    @Test
     void provisioningEncodesNormalizesAndRefusesReinitialization() {
         assertThrows(IllegalStateException.class,
                 () -> new AdminBootstrapConfiguration().firstAdminBootstrap(provisioning, new MockEnvironment()));
