@@ -1,0 +1,26 @@
+# Allow only the inputs required by Dockerfile. This excludes .git, target,
+# IDE metadata, docs, tests, local settings, logs and unrelated files.
+**
+!Dockerfile
+!.dockerignore
+!pom.xml
+!mvnw
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+!src/
+!src/main/
+!src/main/**
+
+# Also exclude secret material if accidentally placed under src/main.
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks
+**/.git
+**/.idea
+**/.vscode
+**/target
